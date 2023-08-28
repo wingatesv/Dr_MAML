@@ -14,8 +14,12 @@ from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
-from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file 
+from methods.anil import ANIL
+from methods.mammo import MAMMO
+from methods.sharpmaml import SharpMAML
 
+from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file 
+import torch.multiprocessing as mp
 
 def save_features(model, data_loader, outfile ):
     f = h5py.File(outfile, 'w')
@@ -41,45 +45,102 @@ def save_features(model, data_loader, outfile ):
     f.close()
 
 if __name__ == '__main__':
+    mp.set_start_method('spawn')
     params = parse_args('save_features')
-    assert params.method != 'maml' and params.method != 'maml_approx', 'maml do not support save_feature and run'
+    
+    print(f'Applying {params.sn} stain normalisation......') if params.sn else print()
+
+    assert params.method not in ['maml', 'maml_approx', 'anil', 'mammo', 'sharpmaml'], 'maml variants do not support save_feature and run'
 
     if 'Conv' in params.model:
-        if params.dataset in ['omniglot', 'cross_char']:
-            image_size = 28
-        else:
-            image_size = 84 
+      image_size = 84 
     else:
-        image_size = 224
-
-    if params.dataset in ['omniglot', 'cross_char']:
-        assert params.model == 'Conv4' and not params.train_aug ,'omniglot only support Conv4 without augmentation'
-        params.model = 'Conv4S'
+      image_size = 224
 
     split = params.split
-    if params.dataset == 'cross':
+    if params.dataset == 'cross_IDC_4x':
         if split == 'base':
-            loadfile = configs.data_dir['miniImagenet'] + 'all.json' 
+            loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
         else:
-            loadfile   = configs.data_dir['CUB'] + split +'.json' 
-    elif params.dataset == 'cross_char':
+            loadfile  = configs.data_dir['BCHI'] + split + '.json'
+    elif params.dataset == 'cross_IDC_10x':
+            if split == 'base':
+                loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
+            else:
+                loadfile  = configs.data_dir['BCHI'] + split + '.json'
+    elif params.dataset == 'cross_IDC_20x':
+            if split == 'base':
+                loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
+            else:
+                loadfile  = configs.data_dir['BCHI'] + split + '.json'
+    elif params.dataset == 'cross_IDC_40x':
+            if split == 'base':
+                loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
+            else:
+                loadfile  = configs.data_dir['BCHI'] + split + '.json'
+
+    elif params.dataset == 'cross_IDC_4x_2':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
+      else:
+          loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
+    elif params.dataset == 'cross_IDC_10x_2':
         if split == 'base':
-            loadfile = configs.data_dir['omniglot'] + 'noLatin.json' 
+            loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
         else:
-            loadfile  = configs.data_dir['emnist'] + split +'.json' 
+            loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
+    elif params.dataset == 'cross_IDC_20x_2':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
+      else:
+          loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
+    elif params.dataset == 'cross_IDC_40x_2':
+        if split == 'base':
+            loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
+        else:
+            loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
+
+    elif params.dataset == 'cross_IDC_4x_3':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
+      else:
+          loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
+    elif params.dataset == 'cross_IDC_10x_3':
+        if split == 'base':
+            loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
+        else:
+            loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
+    elif params.dataset == 'cross_IDC_20x_3':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
+      else:
+          loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
+    elif params.dataset == 'cross_IDC_40x_3':
+        if split == 'base':
+            loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
+        else:
+            loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
+          
+    elif params.dataset == 'cross_IDC_3':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis'] + 'base.json' 
+      else:
+          loadfile  = configs.data_dir['Databiox'] + split + '.json'
+
     else:
         loadfile = configs.data_dir[params.dataset] + split + '.json'
 
     checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
     if params.train_aug:
         checkpoint_dir += '_aug'
+    if params.sn == 'stainnet':
+        checkpoint_dir += '_stainnet'
     if not params.method in ['baseline', 'baseline++'] :
         checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
     if params.save_iter != -1:
         modelfile   = get_assigned_file(checkpoint_dir,params.save_iter)
-#    elif params.method in ['baseline', 'baseline++'] :
-#        modelfile   = get_resume_file(checkpoint_dir) #comment in 2019/08/03 updates as the validation of baseline/baseline++ is added
+
     else:
         modelfile   = get_best_file(checkpoint_dir)
 
@@ -88,20 +149,18 @@ if __name__ == '__main__':
     else:
         outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), split + ".hdf5") 
 
-    datamgr         = SimpleDataManager(image_size, batch_size = 64)
-    data_loader      = datamgr.get_data_loader(loadfile, aug = False)
+    datamgr = SimpleDataManager(image_size, batch_size = 64)
+    data_loader = datamgr.get_data_loader(loadfile, aug = False, sn = params.sn)
 
     if params.method in ['relationnet', 'relationnet_softmax']:
         if params.model == 'Conv4': 
             model = backbone.Conv4NP()
         elif params.model == 'Conv6': 
             model = backbone.Conv6NP()
-        elif params.model == 'Conv4S': 
-            model = backbone.Conv4SNP()
         else:
             model = model_dict[params.model]( flatten = False )
-    elif params.method in ['maml' , 'maml_approx']: 
-       raise ValueError('MAML do not support save feature')
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'mammo', 'sharpmaml']: 
+       raise ValueError('MAML variants do not support save feature')
     else:
         model = model_dict[params.model]()
 
