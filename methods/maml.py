@@ -7,6 +7,8 @@ from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
+from tqdm import tqdm
+
 
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False):
@@ -16,10 +18,13 @@ class MAML(MetaTemplate):
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         
-        self.n_task     = 4
+        self.n_task     = 4 #meta-batch, meta update every meta batch
         self.task_update_num = 5
-        self.train_lr = 0.01
-        self.approx = approx #first order approx.        
+        self.train_lr = 0.01 #this is the inner loop learning rate
+        self.approx = approx #first order approx.    
+        self.inner_loop_steps_list  = []  
+
+
 
     def forward(self,x):
         out  = self.feature.forward(x)
@@ -28,6 +33,7 @@ class MAML(MetaTemplate):
 
     def set_forward(self,x, is_feature = False):
         assert is_feature == False, 'MAML do not support fixed feature' 
+        
         x = x.cuda()
         x_var = Variable(x)
         x_a_i = x_var[:,:self.n_support,:,:,:].contiguous().view( self.n_way* self.n_support, *x.size()[2:]) #support data 
@@ -39,7 +45,8 @@ class MAML(MetaTemplate):
             weight.fast = None
         self.zero_grad()
 
-        for task_step in range(self.task_update_num):
+
+        for task_step in range(self.task_update_num): 
             scores = self.forward(x_a_i)
             set_loss = self.loss_fn( scores, y_a_i) 
             grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
@@ -54,6 +61,8 @@ class MAML(MetaTemplate):
                     weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                 fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
 
+
+        # feed forward query data
         scores = self.forward(x_b_i)
         return scores
 
@@ -68,29 +77,35 @@ class MAML(MetaTemplate):
 
         return loss
 
+
     def train_loop(self, epoch, train_loader, optimizer): #overwrite parrent function
         print_freq = 10
         avg_loss=0
         task_count = 0
         loss_all = []
+
         optimizer.zero_grad()
 
         #train
         for i, (x,_) in enumerate(train_loader):
+
             self.n_query = x.size(1) - self.n_support
             assert self.n_way  ==  x.size(0), "MAML do not support way change"
+            
 
             loss = self.set_forward_loss(x)
-            avg_loss = avg_loss+loss.data[0]
+            avg_loss = avg_loss+loss.item()
             loss_all.append(loss)
 
             task_count += 1
 
             if task_count == self.n_task: #MAML update several tasks at one time
+       
                 loss_q = torch.stack(loss_all).sum(0)
+                loss_value = loss_q.item()
                 loss_q.backward()
-
                 optimizer.step()
+    
                 task_count = 0
                 loss_all = []
             optimizer.zero_grad()
@@ -103,7 +118,8 @@ class MAML(MetaTemplate):
         acc_all = []
         
         iter_num = len(test_loader) 
-        for i, (x,_) in enumerate(test_loader):
+        # for i, (x,_) in enumerate(test_loader):
+        for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way  ==  x.size(0), "MAML do not support way change"
             correct_this, count_this = self.correct(x)
@@ -112,9 +128,8 @@ class MAML(MetaTemplate):
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
-        print('%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        print('%d Test Acc = %4.2f%% ± %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
         if return_std:
             return acc_mean, acc_std
         else:
             return acc_mean
-
