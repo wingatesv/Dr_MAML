@@ -6,24 +6,34 @@ import json
 import numpy as np
 import torchvision.transforms as transforms
 import os
-identity = lambda x:x
+import configs
+from typing import Callable, Optional, Tuple
+
+
+def identity(x):
+    return x
+
+
 class SimpleDataset:
     def __init__(self, data_file, transform, target_transform=identity):
         with open(data_file, 'r') as f:
             self.meta = json.load(f)
         self.transform = transform
         self.target_transform = target_transform
-
+   
 
     def __getitem__(self,i):
         image_path = os.path.join(self.meta['image_names'][i])
         img = Image.open(image_path).convert('RGB')
+
+
         img = self.transform(img)
         target = self.target_transform(self.meta['image_labels'][i])
         return img, target
 
     def __len__(self):
         return len(self.meta['image_names'])
+
 
 
 class SetDataset:
@@ -62,16 +72,18 @@ class SubDataset:
         self.transform = transform
         self.target_transform = target_transform
 
+   
     def __getitem__(self,i):
-        #print( '%d -%d' %(self.cl,i))
         image_path = os.path.join( self.sub_meta[i])
         img = Image.open(image_path).convert('RGB')
+
         img = self.transform(img)
         target = self.target_transform(self.cl)
         return img, target
 
     def __len__(self):
         return len(self.sub_meta)
+
 
 class EpisodicBatchSampler(object):
     def __init__(self, n_classes, n_way, n_episodes):
