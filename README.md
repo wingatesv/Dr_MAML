@@ -13,6 +13,8 @@ If you find our code useful, please consider citing our work using the bibtex:
  - json
 
 ## Getting started
+### Clone the Repo
+
 
 ### Download Datasets
 * Please contact the author for the dataset link at: wingatesvoon@1utar.my
