@@ -14,7 +14,10 @@ If you find our code useful, please consider citing our work using the bibtex:
 
 ## Getting started
 ### Clone the Repo
-
+* Clone the repo into your Google Colab working directory
+<pre>
+!git clone https://github.com/wingatesv/IMAML-IDCG.git
+</pre>
 
 ### Download Datasets
 * Please contact the author for the dataset link at: wingatesvoon@1utar.my
