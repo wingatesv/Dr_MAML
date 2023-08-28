@@ -5,4 +5,7 @@ from . import matchingnet
 from . import protonet
 from . import relationnet
 from . import maml
+from . import anil
+from . import mammo
+from . import sharpmaml
 
