@@ -1,18 +1,11 @@
-# A Closer Look at Few-shot Classification
+# IMAML-IDCG: Gradient-Based Meta-Learning with ImageNet Feature Reusing for Few-Shot Invasive Ductal Carcinoma Grading
 
-This repo contains the reference source code for the paper [A Closer Look at Few-shot Classification](https://arxiv.org/abs/1904.04232) in International Conference on Learning Representations (ICLR 2019). In this project, we provide a integrated testbed for a detailed empirical study for few-shot classification.
+This repo contains the reference source code for the paper [IMAML-IDCG: Gradient-Based Meta-Learning with ImageNet Feature Reusing for Few-Shot Invasive Ductal Carcinoma Grading]
 
 
 ## Citation
 If you find our code useful, please consider citing our work using the bibtex:
-```
-@inproceedings{
-chen2019closerfewshot,
-title={A Closer Look at Few-shot Classification},
-author={Chen, Wei-Yu and Liu, Yen-Cheng and Kira, Zsolt and Wang, Yu-Chiang and  Huang, Jia-Bin},
-booktitle={International Conference on Learning Representations},
-year={2019}
-}
+'''
 ```
 
 ## Enviroment
@@ -84,12 +77,7 @@ https://github.com/cbfinn/maml
 https://github.com/dragen1860/MAML-Pytorch  
 https://github.com/katerakelly/pytorch-maml
 
-## FAQ
-* Q1 Why some of my reproduced results for CUB dataset are around 4~5% with you reported result? (#31, #34, #42)
-* A1 Sorry about my reported the results on the paper may run in different epochs or episodes, please see each issue for details.
 
-* Q2 Why some of my reproduced results for mini-ImageNet dataset are around 1~2% different with your reported results? (#17, #40, #41 #43)
-* A2 Due to random initialization, each training process could lead to different accuracy. Also, each test time could lead to different accuracy.
 
 * Q3 How do you decided the mean and the standard variation for dataset normalization? (#18, #39)
 * A3 I use the mean and standard variation from ImageNet, but you can use the ones calculated from your own dataset. 
