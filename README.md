@@ -5,8 +5,6 @@ This repo contains the reference source code for the paper [IMAML-IDCG: Gradient
 
 ## Citation
 If you find our code useful, please consider citing our work using the bibtex:
-'''
-```
 
 ## Enviroment
  - Python3
@@ -14,50 +12,96 @@ If you find our code useful, please consider citing our work using the bibtex:
  - json
 
 ## Getting started
-### CUB
-* Change directory to `./filelists/CUB`
-* run `source ./download_CUB.sh`
 
-### mini-ImageNet
-* Change directory to `./filelists/miniImagenet`
-* run `source ./download_miniImagenet.sh` 
+### Download Datasets
+* Please contact the author for the dataset link at: wingatesvoon@1utar.my
 
-(WARNING: This would download the 155G ImageNet dataset. You can comment out correponded line 5-6 in `download_miniImagenet.sh` if you already have one.) 
+| Split |     Dataset     | 
+|-------|-----------------|
+| Base  | BreaKHis_4x     | 
+|       | BreaKHis_10x    | 
+|       | BreaKHis_20x    | 
+|       | BreaKHis_40x    | 
+| Novel | BCHI            |
+|       | PathoIDC_20x    | 
+|       | PathoIDC_40x    | 
 
-### mini-ImageNet->CUB (cross)
-* Finish preparation for CUB and mini-ImageNet and you are done!
+### BreaKHis_4x
+* Change directory to `./filelists/BreaKHis_4x`
+* run `source ./get_BreaKHis_4x.sh`
 
-### Omniglot
-* Change directory to `./filelists/omniglot`
-* run `source ./download_omniglot.sh` 
+### BreaKHis_10x
+* Change directory to `./filelists/BreaKHis_10x`
+* run `source ./get_BreaKHis_10x.sh`
 
-### Omniglot->EMNIST (cross_char)
-* Finish preparation for omniglot first
-* Change directory to `./filelists/emnist`
-* run `source ./download_emnist.sh`  
+### BreaKHis_20x
+* Change directory to `./filelists/BreaKHis_20x`
+* run `source ./get_BreaKHis_20x.sh`
+
+### BreaKHis_40x
+* Change directory to `./filelists/BreaKHis_40x`
+* run `source ./get_BreaKHis_40x.sh`
+
+### BCHI
+* Change directory to `./filelists/BCHI`
+* run `source ./get_BCHI.sh`
+
+### PathoIDC_20x
+* Change directory to `./filelists/PathoIDC_20x`
+* run `source ./get_PathoIDC_20x.sh`
+
+### PathoIDC_40x
+* Change directory to `./filelists/PathoIDC_40x`
+* run `source ./get_PathoIDC_40x.sh`
+
+
+### BreaKHis_{}X->BCHI
+* Finish preparation for BreaKHis and BCHI and you are done!
+
+### BreaKHis_{}x->PathoIDC{}x
+* Finish preparation for BreaKHis and PathoIDC and you are done!
+
 
 ### Self-defined setting
-* Require three data split json file: 'base.json', 'val.json', 'novel.json' for each dataset  
+* * Require one data split json file: 'base.json' for each BreaKHis dataset
+* * Require two data split json file: 'val.json', 'novel.json' for BCHI and PathoIDC datasets  
 * The format should follow   
 {"label_names": ["class0","class1",...], "image_names": ["filepath1","filepath2",...],"image_labels":[l1,l2,l3,...]}  
-See test.json for reference
+
 * Put these file in the same folder and change data_dir['DATASETNAME'] in configs.py to the folder path  
+
+## Cross-Domain Configurations
+| Name | Description |
+|------|-------------|
+| cross_IDC_4x | BreaKHis_4x to BCHI |
+| cross_IDC_10x | BreaKHis_10x to BCHI |
+| cross_IDC_20x | BreaKHis_20x to BCHI |
+| cross_IDC_40x | BreaKHis_40x to BCHI |
+| cross_IDC_4x_2 | BreaKHis_4x to PathoIDC_40x |
+| cross_IDC_10x_2 | BreaKHis_10x to PathoIDC_40x  |
+| cross_IDC_20x_2 | BreaKHis_20x to PathoIDC_40x  |
+| cross_IDC_40x_2 | BreaKHis_40x to PathoIDC_40x  |
+| cross_IDC_4x_3 | BreaKHis_4x to PathoIDC_20x |
+| cross_IDC_10x_3 | BreaKHis_10x to PathoIDC_20x  |
+| cross_IDC_20x_3 | BreaKHis_20x to PathoIDC_20x  |
+| cross_IDC_40x_3 | BreaKHis_40x to PathoIDC_20x  |
+
 
 ## Train
 Run
 ```python ./train.py --dataset [DATASETNAME] --model [BACKBONENAME] --method [METHODNAME] [--OPTIONARG]```
 
-For example, run `python ./train.py --dataset miniImagenet --model Conv4 --method baseline --train_aug`  
+For example, run `python ./train.py --dataset cross_IDC_40x --model ResNet34 --method maml --train_n_way 3 --test_n_way 3 --n_shot 1 --stop_epoch 100 --train_aug --sn stainnet`  
 Commands below follow this example, and please refer to io_utils.py for additional options.
 
 ## Save features
 Save the extracted feature before the classifaction layer to increase test speed. This is not applicable to MAML, but are required for other methods.
 Run
-```python ./save_features.py --dataset miniImagenet --model Conv4 --method baseline --train_aug```
+```python ./save_features.py --dataset cross_IDC_40x --model ResNet34 --method relationnet  --train_n_way 3 --n_shot 5 --test_n_way 3 --train_aug --sn stainnet```
 
 ## Test
 Run
-```python ./test.py --dataset miniImagenet --model Conv4 --method baseline --train_aug```
+```python ./test.py --dataset cross_IDC_40x --model ResNet34 --method maml --train_n_way 3 --test_n_way 3 --n_shot 1 --train_aug --sn stainnet```
 
 ## Results
 * The test results will be recorded in `./record/results.txt`
@@ -77,10 +121,3 @@ https://github.com/cbfinn/maml
 https://github.com/dragen1860/MAML-Pytorch  
 https://github.com/katerakelly/pytorch-maml
 
-
-
-* Q3 How do you decided the mean and the standard variation for dataset normalization? (#18, #39)
-* A3 I use the mean and standard variation from ImageNet, but you can use the ones calculated from your own dataset. 
-
-* Q4 Do you have the mini-ImageNet dataset available without downloading the whole ImageNet? (#45 #29)
-* A4 You can use the dataset here https://github.com/oscarknagg/few-shot, but you will need to modify filelists/miniImagenet/write_miniImagenet_filelist.py.
