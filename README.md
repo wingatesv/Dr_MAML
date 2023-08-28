@@ -7,8 +7,9 @@ This repo contains the reference source code for the paper [IMAML-IDCG: Gradient
 If you find our code useful, please consider citing our work using the bibtex:
 
 ## Enviroment
+ - Google Colab
  - Python3
- - [Pytorch](http://pytorch.org/) before 0.4 (for newer vesion, please see issue #3 )
+ - [Pytorch](http://pytorch.org/) 
  - json
 
 ## Getting started
@@ -108,8 +109,7 @@ Run
 * For all the pre-computed results, please see `./record/few_shot_exp_figures.xlsx`. This will be helpful for including your own results for a fair comparison.
 
 ## References
-Our testbed builds upon several existing publicly available code. Specifically, we have modified and integrated the following code into this project:
-
+https://github.com/wyharveychen/CloserLookFewShot
 * Framework, Backbone, Method: Matching Network
 https://github.com/facebookresearch/low-shot-shrink-hallucinate 
 * Omniglot dataset, Method: Prototypical Network
