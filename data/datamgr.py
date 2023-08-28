@@ -5,8 +5,10 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 import data.additional_transforms as add_transforms
+from data.stainnet_transform import StainNetTransform
 from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 from abc import abstractmethod
+import os
 
 class TransformLoader:
     def __init__(self, image_size, 
@@ -20,23 +22,32 @@ class TransformLoader:
         if transform_type=='ImageJitter':
             method = add_transforms.ImageJitter( self.jitter_param )
             return method
+        elif transform_type=='StainNetTransform':
+            method = StainNetTransform()
+            return method
+            
         method = getattr(transforms, transform_type)
-        if transform_type=='RandomSizedCrop':
+        if transform_type=='RandomResizedCrop':
             return method(self.image_size) 
         elif transform_type=='CenterCrop':
             return method(self.image_size) 
-        elif transform_type=='Scale':
+        elif transform_type=='Resize':
             return method([int(self.image_size*1.15), int(self.image_size*1.15)])
         elif transform_type=='Normalize':
             return method(**self.normalize_param )
+
         else:
             return method()
 
-    def get_composed_transform(self, aug = False):
-        if aug:
-            transform_list = ['RandomSizedCrop', 'ImageJitter', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
+    def get_composed_transform(self, aug = False, sn = False):
+        if aug and sn:
+            transform_list = ['RandomResizedCrop', 'StainNetTransform','RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
+        elif sn:
+            transform_list = ['Resize','CenterCrop', 'StainNetTransform' , 'ToTensor', 'Normalize']
+        elif aug:
+          transform_list = ['RandomResizedCrop', 'RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
         else:
-            transform_list = ['Scale','CenterCrop', 'ToTensor', 'Normalize']
+            transform_list = ['Resize','CenterCrop', 'ToTensor', 'Normalize']
 
         transform_funcs = [ self.parse_transform(x) for x in transform_list]
         transform = transforms.Compose(transform_funcs)
@@ -44,7 +55,7 @@ class TransformLoader:
 
 class DataManager:
     @abstractmethod
-    def get_data_loader(self, data_file, aug):
+    def get_data_loader(self, data_file, aug, sn):
         pass 
 
 
@@ -54,10 +65,10 @@ class SimpleDataManager(DataManager):
         self.batch_size = batch_size
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug): #parameters that would change on train/val set
-        transform = self.trans_loader.get_composed_transform(aug)
-        dataset = SimpleDataset(data_file, transform)
-        data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = 12, pin_memory = True)       
+    def get_data_loader(self, data_file, aug, sn): #parameters that would change on train/val set
+        transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
+        dataset = SimpleDataset(data_file, transform = transform)
+        data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True)       
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
 
         return data_loader
@@ -72,12 +83,10 @@ class SetDataManager(DataManager):
 
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug): #parameters that would change on train/val set
-        transform = self.trans_loader.get_composed_transform(aug)
-        dataset = SetDataset( data_file , self.batch_size, transform )
+    def get_data_loader(self, data_file, aug, sn): #parameters that would change on train/val set
+        transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
+        dataset = SetDataset( data_file , self.batch_size, transform = transform)
         sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide )  
-        data_loader_params = dict(batch_sampler = sampler,  num_workers = 12, pin_memory = True)       
+        data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True)       
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
-
-
