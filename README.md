@@ -8,6 +8,7 @@ If you find our code useful, please consider citing our work using the bibtex:
 
 ## Enviroment
  - Google Colab
+ - Google Drive
  - Python3
  - [Pytorch](http://pytorch.org/) 
  - json
@@ -19,18 +20,46 @@ If you find our code useful, please consider citing our work using the bibtex:
 !git clone https://github.com/wingatesv/IMAML-IDCG.git
 </pre>
 
-### Download Datasets
-* Please contact the author for the dataset link at: wingatesvoon@1utar.my
+### Datasets Download
+* Please contact the author for more information: wingatesvoon@1utar.my
 
-| Split |     Dataset     | 
-|-------|-----------------|
-| Base  | BreaKHis_4x     | 
-|       | BreaKHis_10x    | 
-|       | BreaKHis_20x    | 
-|       | BreaKHis_40x    | 
-| Novel | BCHI            |
-|       | PathoIDC_20x    | 
-|       | PathoIDC_40x    | 
+  
+| BreaKHis Class     | 4X   | 10X  | 20X  | 40X  |
+|--------------------|------|------|------|------|
+| Adenosis           | 114  | 113  | 111  | 106  |
+| Phyllodes Tumor    | 149  | 150  | 140  | 130  |
+| Tubular Adenoma    | 109  | 121  | 108  | 115  |
+| Lobular Carcinoma  | 156  | 170  | 163  | 137  |
+| Papillary Carcinoma| 145  | 142  | 135  | 138  |
+| Mucinous Carcinoma | 205  | 222  | 196  | 169  |
+| Fibroadenoma       | 253  | 260  | 264  | 237  |
+| Ductal Carcinoma   | 864  | 903  | 896  | 788  |
+| Total              | 1995 | 2081 | 2013 | 1820 |
+
+
+| BCHI Class  | 40X |
+|--------|------------------|
+| Grade 1|       98         |
+| Grade 2|       102        |
+| Grade 3|       82         |
+
+
+| PathoIDC Class  | 20X  | 40X  |
+|--------|------|------|
+| Grade 1|  600 |  317 |
+| Grade 2|  641 |  480 |
+| Grade 3| 1245 |  361 |
+
+
+| Split |     Dataset     | link |
+|-------|-----------------|---------------------------------------------------------------------------------------|
+| Base (BC Classification)  | BreaKHis_4x     | https://drive.google.com/file/d/1CWRzSFRV1WsRyA_g8yYQvIQGs_QnUyYR/view?usp=sharing    |
+|       | BreaKHis_10x    | https://drive.google.com/file/d/1-5PuA8i4vmUN1fHAH8pveEjhLn5S5ACU/view?usp=sharing    |
+|       | BreaKHis_20x    | https://drive.google.com/file/d/1-JcLWy-cFmd7LVdcKaXPwJK-ox3_r5m2/view?usp=share_link |
+|       | BreaKHis_40x    | https://drive.google.com/file/d/1yDbX4Nm39zOag4jqLeoxeWSQ3SeAZ0Aa/view?usp=share_link |
+| Novel (IDC Grading) | BCHI            | https://drive.google.com/file/d/1ssUKwT2jByxMPQahS58TFH_nga2yQ9D1/view?usp=share_link |
+|       | PathoIDC_20x    | https://drive.google.com/file/d/1dXuY1TePiwcrsrvFW-I3-8CidaVXmgMx/view?usp=share_link |
+|       | PathoIDC_40x    | https://drive.google.com/file/d/1-J6Hw2MZP5Grnqfgpl1-ZNk_pCGJWtyI/view?usp=share_link |
 
 ### BreaKHis_4x
 * Change directory to `./filelists/BreaKHis_4x`
@@ -73,7 +102,7 @@ If you find our code useful, please consider citing our work using the bibtex:
 * * Require two data split json file: 'val.json', 'novel.json' for BCHI and PathoIDC datasets  
 * The format should follow   
 {"label_names": ["class0","class1",...], "image_names": ["filepath1","filepath2",...],"image_labels":[l1,l2,l3,...]}  
-
+* For example, run `source ./get_BCHI_filelist.py` to generate json files for the BCHI dataset
 * Put these file in the same folder and change data_dir['DATASETNAME'] in configs.py to the folder path  
 
 ## Cross-Domain Configurations
