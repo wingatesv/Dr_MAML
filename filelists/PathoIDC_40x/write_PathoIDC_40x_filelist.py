@@ -6,7 +6,7 @@ from os import listdir
 from os.path import isfile, join, isdir
 
 data_path = '/content/PathoIDC_40x/PathoIDC_40x' 
-savedir = '/content/drive/MyDrive/PhD/IDC_Grading_FSL/filelists/PathoIDC_40x/'
+savedir = '/content/IMAML-IDCG/filelists/PathoIDC_40x/'
 dataset_list = ['val', 'novel']
 
 folder_list = [f for f in listdir(data_path) if isdir(join(data_path, f))]
