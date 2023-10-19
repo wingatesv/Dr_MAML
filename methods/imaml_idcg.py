@@ -13,9 +13,9 @@ from collections import OrderedDict
 
 
 
-class MAMMO(MetaTemplate):
+class IMAML_IDCG(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False):
-        super(MAMMO, self).__init__( model_func,  n_way, n_support, change_way = False)
+        super(IMAML_IDCG, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -38,7 +38,7 @@ class MAMMO(MetaTemplate):
         return scores
 
     def set_forward(self,x, is_feature = False):
-        assert is_feature == False, 'MAMMO do not support fixed feature' 
+        assert is_feature == False, 'IMAML_IDCG do not support fixed feature' 
         
         x = x.cuda()
         x_var = Variable(x)
@@ -170,7 +170,7 @@ class MAMMO(MetaTemplate):
         iter_num = len(test_loader) 
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way  ==  x.size(0), "ANIL do not support way change"
+            assert self.n_way  ==  x.size(0), "IMAML_IDCG do not support way change"
             correct_this, count_this = self.correct(x)
             acc_all.append(correct_this/ count_this *100 )
 
