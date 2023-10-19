@@ -5,7 +5,7 @@ import torch.nn as nn
 from PIL import Image
 import numpy as np
 
-STAINNET_WEIGHTS = '/content/IDC_Grading_FSL/data/StainNet-Public-centerUni_layer3_ch32.pth'
+STAINNET_WEIGHTS = '/content/IMAML-IDCG/data/StainNet-Public-centerUni_layer3_ch32.pth'
 
 class StainNet(nn.Module):
     def __init__(self, input_nc=3, output_nc=3, n_layer=3, n_channel=32, kernel_size=1):
