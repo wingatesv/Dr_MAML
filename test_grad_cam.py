@@ -24,7 +24,7 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
-from methods.mammo import MAMMO
+from methods.imaml_idcg import IMAML_IDCG
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
 
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method_1 == 'relationnet' else 'softmax'
         model_1           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method_1 in ['maml' , 'maml_approx', 'anil', 'mammo']:
+    elif params.method_1 in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -80,9 +80,9 @@ if __name__ == '__main__':
       elif params.method_1 == 'anil':
         model_1 = ANIL(  model_dict[params.model_1], approx = False , **few_shot_params )
 
-      elif params.method_1 == 'mammo':
-        assert params.model_1 in ['ResNet18_IM_F', 'ResNet34_IM_F', 'ResNet50_IM_F', 'ResNet18_IM', 'ResNet34_IM', 'ResNet50_IM'], 'MAMMO only support ImageNet pre-trained feature extractor'
-        model_1 = MAMMO(  model_dict[params.model_1], approx = False , **few_shot_params )
+      elif params.method_1 == 'imaml_idcg':
+        assert params.model_1 in ['ResNet18_IM_F', 'ResNet34_IM_F', 'ResNet50_IM_F', 'ResNet18_IM', 'ResNet34_IM', 'ResNet50_IM'], 'IMAML_IDCG only support ImageNet pre-trained feature extractor'
+        model_1 = IMAML_IDCG(  model_dict[params.model_1], approx = False , **few_shot_params )
 
 
     else:
@@ -129,7 +129,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model_2           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method_2 in ['maml' , 'maml_approx', 'anil', 'mammo']:
+    elif params.method_2 in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -143,9 +143,9 @@ if __name__ == '__main__':
       elif params.method_2 == 'anil':
         model_2 = ANIL(  model_dict[params.model_2], approx = False , **few_shot_params )
 
-      elif params.method_2 == 'mammo':
-        assert params.model_2 in ['ResNet18_IM_F', 'ResNet34_IM_F', 'ResNet50_IM_F', 'ResNet18_IM', 'ResNet34_IM', 'ResNet50_IM'], 'MAMMO only support ImageNet pre-trained feature extractor'
-        model_2 = MAMMO(  model_dict[params.model_2], approx = False , **few_shot_params )
+      elif params.method_2 == 'imaml_idcg':
+        assert params.model_2 in ['ResNet18_IM_F', 'ResNet34_IM_F', 'ResNet50_IM_F', 'ResNet18_IM', 'ResNet34_IM', 'ResNet50_IM'], 'IMAML_IDCG only support ImageNet pre-trained feature extractor'
+        model_2 = IMAML_IDCG(  model_dict[params.model_2], approx = False , **few_shot_params )
 
 
     else:
@@ -183,7 +183,7 @@ if __name__ == '__main__':
 
 
 
-    if params.method_1 in ['maml', 'maml_approx', 'anil', 'mammo'] and params.method_2 in ['maml', 'maml_approx', 'anil', 'mammo']: #maml do not support testing with feature
+    if params.method_1 in ['maml', 'maml_approx', 'anil', 'imaml_idcg'] and params.method_2 in ['maml', 'maml_approx', 'anil', 'imaml_idcg']: #maml do not support testing with feature
         if 'Conv' in params.model_1 or 'Conv' in params.model_2:
             image_size = 84 
         else:
