@@ -23,7 +23,7 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
-from methods.mammo import MAMMO
+from methods.imaml_idcg import IMAML_IDCG
 from methods.sharpmaml import SharpMAML
 from sam import SAM
 
@@ -195,7 +195,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'mammo', 'sharpmaml']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -225,7 +225,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'mammo', 'sharpmaml']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -238,11 +238,11 @@ if __name__=='__main__':
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
 
-          elif params.method == 'mammo':
-            assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'mammo do not support non-ImageNet pretrained model'
+          elif params.method == 'imaml_idcg':
+            assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'imaml_idcg do not support non-ImageNet pretrained model'
             feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method)
-            model = MAMMO(  feature_backbone, approx = False , **train_few_shot_params )
-            # model = MAMMO(  model_dict[params.model], approx = False , **train_few_shot_params )
+            model = IMAML_IDCG(  feature_backbone, approx = False , **train_few_shot_params )
+            # model = IMAML_IDCG(  model_dict[params.model], approx = False , **train_few_shot_params )
 
           elif params.method == 'sharpmaml':
             model = SharpMAML(  model_dict[params.model], approx = False , **train_few_shot_params )
