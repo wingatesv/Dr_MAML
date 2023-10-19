@@ -15,7 +15,7 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
-from methods.mammo import MAMMO
+from methods.imaml_idcg import imaml_idcg
 from methods.sharpmaml import SharpMAML
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file 
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     
     print(f'Applying {params.sn} stain normalisation......') if params.sn else print()
 
-    assert params.method not in ['maml', 'maml_approx', 'anil', 'mammo', 'sharpmaml'], 'maml variants do not support save_feature and run'
+    assert params.method not in ['maml', 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml'], 'maml variants do not support save_feature and run'
 
     if 'Conv' in params.model:
       image_size = 84 
@@ -159,7 +159,7 @@ if __name__ == '__main__':
             model = backbone.Conv6NP()
         else:
             model = model_dict[params.model]( flatten = False )
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'mammo', 'sharpmaml']: 
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']: 
        raise ValueError('MAML variants do not support save feature')
     else:
         model = model_dict[params.model]()
