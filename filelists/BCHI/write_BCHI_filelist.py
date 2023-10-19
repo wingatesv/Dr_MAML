@@ -1,4 +1,3 @@
-import configs
 import random
 import numpy as np
 import os
@@ -6,7 +5,7 @@ from os import listdir
 from os.path import isfile, join, isdir
 
 data_path = '/content/BCHI/BCHI Dataset ' 
-savedir = configs.ROOT_DIR + '/filelists/BCHI/'
+savedir = '/content/IMAML-IDCG/filelists/BCHI/'
 dataset_list = ['val', 'novel']
 
 folder_list = [f for f in listdir(data_path) if isdir(join(data_path, f))]
