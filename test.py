@@ -24,7 +24,7 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
-from methods.mammo import MAMMO
+from methods.imaml_idcg import IMAML_IDCG
 from methods.sharpmaml import SharpMAML
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
@@ -86,7 +86,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'mammo', 'sharpmaml']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -99,8 +99,8 @@ if __name__ == '__main__':
       elif params.method == 'anil':
         model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
 
-      elif params.method == 'mammo':
-        assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'mammo do not support non-ImageNet pretrained model'
+      elif params.method == 'imaml_idcg':
+        assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'imaml_idcg do not support non-ImageNet pretrained model'
         feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method )
         model = MAMMO(  feature_backbone, approx = False , **few_shot_params )
         # model = MAMMO(  model_dict[params.model], approx = False , **few_shot_params )
@@ -140,7 +140,7 @@ if __name__ == '__main__':
         split_str = split + "_" +str(params.save_iter)
     else:
         split_str = split
-    if params.method in ['maml', 'maml_approx', 'anil', 'mammo', 'sharpmaml']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
         elif 'EffNet' in params.model:
