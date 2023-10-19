@@ -102,8 +102,8 @@ if __name__ == '__main__':
       elif params.method == 'imaml_idcg':
         assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'imaml_idcg do not support non-ImageNet pretrained model'
         feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method )
-        model = MAMMO(  feature_backbone, approx = False , **few_shot_params )
-        # model = MAMMO(  model_dict[params.model], approx = False , **few_shot_params )
+        model = IMAML_IDCG(  feature_backbone, approx = False , **few_shot_params )
+        # model = IMAML_IDCG(  model_dict[params.model], approx = False , **few_shot_params )
 
       elif params.method == 'sharpmaml':
         model = SharpMAML(  model_dict[params.model], approx = False , **few_shot_params )
