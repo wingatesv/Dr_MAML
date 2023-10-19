@@ -1,4 +1,4 @@
-ROOT_DIR = '/content/drive/MyDrive/PhD/IDC_Grading_FSL'
+ROOT_DIR = '/content/IMAML-IDCG'
 
 save_dir = ROOT_DIR + '/best_model'
 data_dir = {}
