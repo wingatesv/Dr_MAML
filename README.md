@@ -126,21 +126,20 @@ If you find our code useful, please consider citing our work using the bibtex:
 Run
 ```python ./train.py --dataset [DATASETNAME] --model [BACKBONENAME] --method [METHODNAME] [--OPTIONARG]```
 
-For example, run `python ./train.py --dataset cross_IDC_40x --model ResNet34 --method maml --train_n_way 3 --test_n_way 3 --n_shot 1 --stop_epoch 100 --train_aug --sn stainnet`  
+For example, run `python ./train.py --dataset cross_IDC_40x --model ResNet34 --method imaml_idcg --train_n_way 3 --test_n_way 3 --n_shot 1 --stop_epoch 100 --train_aug --sn stainnet`  
 Commands below follow this example, and please refer to io_utils.py for additional options.
 
 ## Save features
-Save the extracted feature before the classifaction layer to increase test speed. This is not applicable to MAML, but are required for other methods.
+Save the extracted feature before the classifaction layer to increase test speed. This is not applicable to MAML-based methods, but are required for other methods.
 Run
 ```python ./save_features.py --dataset cross_IDC_40x --model ResNet34 --method relationnet  --train_n_way 3 --n_shot 5 --test_n_way 3 --train_aug --sn stainnet```
 
 ## Test
 Run
-```python ./test.py --dataset cross_IDC_40x --model ResNet34 --method maml --train_n_way 3 --test_n_way 3 --n_shot 1 --train_aug --sn stainnet```
+```python ./test.py --dataset cross_IDC_40x --model ResNet34 --method imaml_idcg --train_n_way 3 --test_n_way 3 --n_shot 1 --train_aug --sn stainnet```
 
 ## Results
 * The test results will be recorded in `./record/results.txt`
-* For all the pre-computed results, please see `./record/few_shot_exp_figures.xlsx`. This will be helpful for including your own results for a fair comparison.
 
 ## References
 * Main Framework
