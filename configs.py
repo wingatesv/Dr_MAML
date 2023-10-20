@@ -9,4 +9,4 @@ data_dir['BreaKHis_40x']  = ROOT_DIR + '/filelists/BreaKHis_40x/'
 data_dir['BCHI'] = ROOT_DIR + '/filelists/BCHI/' 
 data_dir['PathoIDC_20x'] = ROOT_DIR + '/filelists/PathoIDC_20x/' 
 data_dir['PathoIDC_40x'] = ROOT_DIR + '/filelists/PathoIDC_40x/' 
-data_dir['Databiox'] = ROOT_DIR + '/filelists/Databiox/' 
+

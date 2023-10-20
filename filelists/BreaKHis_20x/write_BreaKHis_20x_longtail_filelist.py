@@ -5,7 +5,7 @@ import os
 import json
 import random
 
-data_path = '/content/BreaKHis_40x/BreaKHis_400x'
+data_path = '/content/BreaKHis_20x/content/BreakHis_200x'
 savedir = '/content/'
 dataset_list = ['base','val','novel']
 
