@@ -6,8 +6,8 @@ import json
 import random
 
 data_path = '/content/BreaKHis_40x/BreaKHis_400x'
-savedir = '/content/'
-dataset_list = ['base','val','novel']
+savedir = '/content/New_MAML/filelists/BreaKHis_40x/'
+dataset_list = ['base_long','val_long','novel_long']
 
 folder_list = ['fibroadenoma', 'mucinous_carcinoma', 'ductal_carcinoma', 'tubular_adenoma', 'adenosis', 'phyllodes_tumor', 'papillary_carcinoma', 'lobular_carcinoma']
 folder_list.sort()
@@ -27,15 +27,15 @@ for dataset in dataset_list:
     file_list = []
     label_list = []
     for i, classfile_list in enumerate(classfile_list_all):
-        if folder_list[i] in base_classes and dataset == 'base':
+        if folder_list[i] in base_classes and dataset == 'base_long':
             file_list += classfile_list
             label_list += np.repeat(i, len(classfile_list)).tolist()
         elif folder_list[i] in val_novel_classes:
             half_index = len(classfile_list) // 2
-            if dataset == 'val':
+            if dataset == 'val_long':
                 file_list += classfile_list[:half_index]
                 label_list += np.repeat(i, half_index).tolist()
-            elif dataset == 'novel':
+            elif dataset == 'novel_long':
                 file_list += classfile_list[half_index:]
                 label_list += np.repeat(i, len(classfile_list) - half_index).tolist()
 
