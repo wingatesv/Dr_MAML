@@ -8,7 +8,7 @@ import random
 
 
 data_path = '/content/BreaKHis_20x/content/BreakHis_200x'
-savedir = '/content/IMAML-IDCG/filelists/BreaKHis_20x/'
+savedir = '/content/New_MAML/filelists/BreaKHis_20x/'
 dataset_list = ['base']
 
 folder_list = [f for f in listdir(data_path) if isdir(join(data_path, f))]

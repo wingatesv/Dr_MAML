@@ -4,12 +4,11 @@ from os.path import isfile, isdir, join
 import os
 import json
 import random
-# import configs
-
 
 data_path = '/content/BreaKHis_10x/content/BreakHis_100x'
-savedir = '/content/IMAML-IDCG/filelists/BreaKHis_10x/'
+savedir = '/content/New_MAML/filelists/BreaKHis_10x/'
 dataset_list = ['base']
+
 
 folder_list = [f for f in listdir(data_path) if isdir(join(data_path, f))]
 folder_list.sort()

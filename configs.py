@@ -1,4 +1,4 @@
-ROOT_DIR = '/content/IMAML-IDCG'
+ROOT_DIR = '/content/New_MAML'
 
 save_dir = ROOT_DIR + '/best_model'
 data_dir = {}
