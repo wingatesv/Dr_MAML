@@ -5,6 +5,9 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 from torchvision.transforms import AutoAugment, AutoAugmentPolicy, InterpolationMode, RandAugment, AugMix
+from torchvision.transforms import v2
+from torch.utils.data import default_collate
+import data.additional_transforms as add_transforms
 from data.stainnet_transform import StainNetTransform
 from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 from abc import abstractmethod
@@ -102,10 +105,23 @@ class SimpleDataManager(DataManager):
         self.batch_size = batch_size
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug, sn): #parameters that would change on train/val set
+    def get_data_loader(self, data_file, aug, sn, cutmix = False, mixup = False): #parameters that would change on train/val set
+        if cutmix:
+          advanced_transform = v2.CutMix(num_classes=3)
+        if mixup:
+          advanced_transform = v2.MixUp(num_classes=3)
+        
+        def collate_fn(batch):
+          return advanced_transform(*default_collate(batch))
+
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
         dataset = SimpleDataset(data_file, transform = transform)
-        data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True)       
+
+        if cutmix or mixup:
+          data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True, collate_fn=collate_fn)       
+        else:
+          data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True) 
+
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
 
         return data_loader
@@ -120,10 +136,23 @@ class SetDataManager(DataManager):
 
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug, sn): #parameters that would change on train/val set
+    def get_data_loader(self, data_file, aug, sn, cutmix = False, mixup = False): #parameters that would change on train/val set
+        if cutmix:
+          advanced_transform = v2.CutMix(num_classes=self.n_way)
+        if mixup:
+          advanced_transform = v2.MixUp(num_classes=self.n_way)
+
+        def collate_fn(batch):
+          return advanced_transform(*default_collate(batch))
+
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
         dataset = SetDataset( data_file , self.batch_size, transform = transform)
         sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide )  
-        data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True)       
+
+        if cutmix or mixup:
+          data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True, collate_fn=collate_fn)       
+        else:
+          data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True)       
+  
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
