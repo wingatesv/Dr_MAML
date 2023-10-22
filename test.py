@@ -172,6 +172,7 @@ if __name__ == '__main__':
           else:
               loadfile  = configs.data_dir['BCHI'] + split +'.json'
 
+
         elif params.dataset == 'cross_IDC_4x_2':
           if split == 'base':
               loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
@@ -192,6 +193,7 @@ if __name__ == '__main__':
               loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
           else:
               loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
+
 
         elif params.dataset == 'cross_IDC_4x_3':
           if split == 'base':
@@ -214,14 +216,31 @@ if __name__ == '__main__':
           else:
               loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
 
-        elif params.dataset == 'cross_IDC_3':
+
+        elif params.dataset == 'long_tail_4x':
           if split == 'base':
-              loadfile = configs.data_dir['BreaKHis'] + 'base.json' 
+              loadfile = configs.data_dir['BreaKHis_4x'] + 'base_long.json' 
           else:
-              loadfile  = configs.data_dir['Databiox'] + split +'.json' 
+              loadfile  = configs.data_dir['BreaKHis_4x'] + split + '_long.json'
+        elif params.dataset == 'long_tail_10x':
+          if split == 'base':
+              loadfile = configs.data_dir['BreaKHis_10x'] + 'base_long.json' 
+          else:
+              loadfile  = configs.data_dir['BreaKHis_10x'] + split + '_long.json'
+        elif params.dataset == 'long_tail_20x':
+          if split == 'base':
+              loadfile = configs.data_dir['BreaKHis_20x'] + 'base_long.json' 
+          else:
+              loadfile  = configs.data_dir['BreaKHis_20x'] + split + '_long.json'
+        elif params.dataset == 'long_tail_40x':
+          if split == 'base':
+              loadfile = configs.data_dir['BreaKHis_40x'] + 'base_long.json' 
+          else:
+              loadfile  = configs.data_dir['BreaKHis_40x'] + split + '_long.json'
 
         else:    
-          loadfile  = configs.data_dir[params.dataset] + split + '.json'
+           raise ValueError(f"Unsupported dataset: {params.dataset}")
+           
 
         novel_loader     = datamgr.get_data_loader( loadfile, aug = False, sn = params.sn)
 

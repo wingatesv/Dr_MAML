@@ -116,7 +116,7 @@ if __name__=='__main__':
     np.random.seed(10)
     params = parse_args('train')
 
-
+    #  Cross Domain from BreaKHis to BCHI 
     if params.dataset == 'cross_IDC_4x':
         base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
         val_file   = configs.data_dir['BCHI'] + 'val.json' 
@@ -130,7 +130,7 @@ if __name__=='__main__':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
         val_file   = configs.data_dir['BCHI'] + 'val.json' 
 
-
+    #  Cross Domain from BreaKHis to PathoIDC 40x 
     elif params.dataset == 'cross_IDC_4x_2':
         base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
         val_file   = configs.data_dir['PathoIDC_40x'] + 'val.json' 
@@ -144,6 +144,7 @@ if __name__=='__main__':
             base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
             val_file   = configs.data_dir['PathoIDC_40x'] + 'val.json' 
 
+    #  Cross Domain from BreaKHis to PathoIDC 20x 
     elif params.dataset == 'cross_IDC_4x_3':
         base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
         val_file   = configs.data_dir['PathoIDC_20x'] + 'val.json' 
@@ -157,13 +158,22 @@ if __name__=='__main__':
             base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
             val_file   = configs.data_dir['PathoIDC_20x'] + 'val.json' 
 
+    #  BreaKHis long tail distribution problem
+    elif params.dataset == 'long_tail_4x':
+        base_file = configs.data_dir['BreaKHis_4x'] + 'base_long.json' 
+        val_file   = configs.data_dir['BreaKHis_4x'] + 'val_long.json' 
+    elif params.dataset == 'long_tail_10x':
+        base_file = configs.data_dir['BreaKHis_10x'] + 'base_long.json' 
+        val_file   = configs.data_dir['BreaKHis_10x'] + 'val_long.json' 
+    elif params.dataset == 'long_tail_20x':
+        base_file = configs.data_dir['BreaKHis_20x'] + 'base_long.json' 
+        val_file   = configs.data_dir['BreaKHis_20x'] + 'val_long.json' 
+    elif params.dataset == 'long_tail_40x':
+        base_file = configs.data_dir['BreaKHis_40x'] + 'base_long.json' 
+        val_file   = configs.data_dir['BreaKHis_40x'] + 'val_long.json' 
 
-    elif params.dataset == 'cross_IDC_3':
-        base_file = configs.data_dir['BreaKHis'] + 'base.json' 
-        val_file   = configs.data_dir['Databiox'] + 'val.json' 
     else:
-        base_file = configs.data_dir[params.dataset] + 'base.json' 
-        val_file   = configs.data_dir[params.dataset] + 'val.json' 
+        raise ValueError(f"Unsupported dataset: {params.dataset}")
          
     if 'Conv' in params.model:
       image_size = 84
