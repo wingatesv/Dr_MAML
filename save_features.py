@@ -48,7 +48,7 @@ if __name__ == '__main__':
     mp.set_start_method('spawn')
     params = parse_args('save_features')
     
-    print(f'Applying {params.sn} stain normalisation......') if params.sn else print()
+    print(f'Applying StainNet stain normalisation......') if params.sn else print()
 
     assert params.method not in ['maml', 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml'], 'maml variants do not support save_feature and run'
 
@@ -165,7 +165,7 @@ if __name__ == '__main__':
         outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), split + ".hdf5") 
 
     datamgr = SimpleDataManager(image_size, batch_size = 64)
-    data_loader = datamgr.get_data_loader(loadfile, aug = False, sn = params.sn)
+    data_loader = datamgr.get_data_loader(loadfile, aug = 'none', sn = params.sn)
 
     if params.method in ['relationnet', 'relationnet_softmax']:
         if params.model == 'Conv4': 

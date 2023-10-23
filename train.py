@@ -192,13 +192,14 @@ if __name__=='__main__':
         else: # other meta-learning methods
          params.stop_epoch = 100 
 
-    print(f'Applying {params.sn} stain normalisation......') if params.sn else print()
+    print(f'Applying {params.train_aug} data augmentation ......')
+    print(f'Applying StainNet stain normalisation......') if params.sn else print()
     
     if params.method in ['baseline', 'baseline++'] :
       base_datamgr    = SimpleDataManager(image_size, batch_size = 16)
       base_loader     = base_datamgr.get_data_loader( base_file , aug = params.train_aug, sn = params.sn)
       val_datamgr     = SimpleDataManager(image_size, batch_size = 64)
-      val_loader      = val_datamgr.get_data_loader( val_file, aug = False, sn = params.sn)
+      val_loader      = val_datamgr.get_data_loader( val_file, aug = 'none', sn = params.sn)
      
       if params.method == 'baseline':
             model           = BaselineTrain( model_dict[params.model], params.num_classes)
@@ -216,7 +217,7 @@ if __name__=='__main__':
         base_loader  = base_datamgr.get_data_loader( base_file , aug = params.train_aug,  sn = params.sn)
         
         val_datamgr = SetDataManager(image_size, n_query = n_query, **test_few_shot_params)
-        val_loader = val_datamgr.get_data_loader( val_file, aug = False, sn = params.sn) 
+        val_loader = val_datamgr.get_data_loader( val_file, aug = 'none', sn = params.sn) 
         #a batch for SetDataManager: a [n_way, n_support + n_query, dim, w, h] tensor  
 
         if params.method == 'protonet':
@@ -252,37 +253,10 @@ if __name__=='__main__':
             assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'imaml_idcg do not support non-ImageNet pretrained model'
             feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method)
             model = IMAML_IDCG(  feature_backbone, approx = False , **train_few_shot_params )
-            # model = IMAML_IDCG(  model_dict[params.model], approx = False , **train_few_shot_params )
+
 
           elif params.method == 'sharpmaml':
             model = SharpMAML(  model_dict[params.model], approx = False , **train_few_shot_params )
               
         else:
           raise ValueError('Unknown method')
-
-    model = model.cuda()
-
-    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
-    if params.train_aug:
-        params.checkpoint_dir += '_aug'
-    if params.sn == 'stainnet':
-        params.checkpoint_dir += '_stainnet'
-    if not params.method  in ['baseline', 'baseline++']: 
-        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
-
-    if not os.path.isdir(params.checkpoint_dir):
-        os.makedirs(params.checkpoint_dir)
-
-    start_epoch = params.start_epoch
-    stop_epoch = params.stop_epoch
-   
-
-    if params.resume:
-        resume_file = get_resume_file(params.checkpoint_dir)
-        if resume_file is not None:
-            tmp = torch.load(resume_file)
-            start_epoch = tmp['epoch']+1
-            model.load_state_dict(tmp['state'])
-
-
-    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)

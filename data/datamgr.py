@@ -86,10 +86,12 @@ class TransformLoader:
             transform_list = ['AugMix', 'StainNetTransform', 'ToTensor', 'Normalize']
         elif aug == 'augmix':
             transform_list = ['AugMix', 'ToTensor', 'Normalize']
-        elif sn:
+        elif (aug == 'none' or aug == 'cutmix' or aug =='mixup') and sn:
             transform_list = ['Resize', 'CenterCrop', 'StainNetTransform', 'ToTensor', 'Normalize']
-        else:
+        elif aug == 'none' or aug == 'cutmix' or aug =='mixup':
             transform_list = ['Resize', 'CenterCrop', 'ToTensor', 'Normalize']
+        else:
+            raise  ValueError(f"Unsupported augmentation: {aug}")
 
 
 
@@ -105,10 +107,10 @@ class SimpleDataManager(DataManager):
         self.batch_size = batch_size
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug, sn, cutmix = False, mixup = False): #parameters that would change on train/val set
-        if cutmix:
+    def get_data_loader(self, data_file, aug, sn): #parameters that would change on train/val set
+        if aug == 'cutmix':
           advanced_transform = v2.CutMix(num_classes=3)
-        if mixup:
+        if aug == 'mixup':
           advanced_transform = v2.MixUp(num_classes=3)
         
         def collate_fn(batch):
@@ -117,7 +119,7 @@ class SimpleDataManager(DataManager):
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
         dataset = SimpleDataset(data_file, transform = transform)
 
-        if cutmix or mixup:
+        if aug == 'cutmix' or aug == 'mixup':
           data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True, collate_fn=collate_fn)       
         else:
           data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True) 
@@ -137,9 +139,9 @@ class SetDataManager(DataManager):
         self.trans_loader = TransformLoader(image_size)
 
     def get_data_loader(self, data_file, aug, sn, cutmix = False, mixup = False): #parameters that would change on train/val set
-        if cutmix:
+        if aug == 'cutmix':
           advanced_transform = v2.CutMix(num_classes=self.n_way)
-        if mixup:
+        if aug == 'mixup':
           advanced_transform = v2.MixUp(num_classes=self.n_way)
 
         def collate_fn(batch):
@@ -149,7 +151,7 @@ class SetDataManager(DataManager):
         dataset = SetDataset( data_file , self.batch_size, transform = transform)
         sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide )  
 
-        if cutmix or mixup:
+        if aug == 'cutmix' or aug == 'mixup':
           data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True, collate_fn=collate_fn)       
         else:
           data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True)       

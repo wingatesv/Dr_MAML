@@ -60,7 +60,7 @@ if __name__ == '__main__':
     
 
     params = parse_args('test')
-    print(f'Applying {params.sn} stain normalisation......') if params.sn else print()
+    print(f'Applying StainNet stain normalisation......') if params.sn else print()
 
     acc_all = []
     iter_num = 600
@@ -242,7 +242,7 @@ if __name__ == '__main__':
            raise ValueError(f"Unsupported dataset: {params.dataset}")
            
 
-        novel_loader     = datamgr.get_data_loader( loadfile, aug = False, sn = params.sn)
+        novel_loader     = datamgr.get_data_loader( loadfile, aug = 'none', sn = params.sn)
 
         if params.adaptation:
             model.task_update_num = 100 #We perform adaptation on MAML simply by updating more times.
