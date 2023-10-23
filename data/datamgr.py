@@ -12,6 +12,8 @@ from data.stainnet_transform import StainNetTransform
 from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 from abc import abstractmethod
 import os
+        
+
 
 class TransformLoader:
     def __init__(self, image_size, normalize_param=None, jitter_param=None):
@@ -93,6 +95,10 @@ class TransformLoader:
         else:
             raise  ValueError(f"Unsupported augmentation: {aug}")
 
+        transform_funcs = [ self.parse_transform(x) for x in transform_list]
+        transform = transforms.Compose(transform_funcs)
+        return transform
+
 
 
 class DataManager:
@@ -101,28 +107,35 @@ class DataManager:
         pass 
 
 
+
 class SimpleDataManager(DataManager):
     def __init__(self, image_size, batch_size):        
         super(SimpleDataManager, self).__init__()
         self.batch_size = batch_size
         self.trans_loader = TransformLoader(image_size)
-
+        self.advanced_transform = None
+    '''
+    def collate_fn(self, batch):
+        return self.advanced_transform(*default_collate(batch))
+    '''
+    
     def get_data_loader(self, data_file, aug, sn): #parameters that would change on train/val set
+        '''
         if aug == 'cutmix':
-          advanced_transform = v2.CutMix(num_classes=3)
+          self.advanced_transform = v2.CutMix(num_classes=2)
         if aug == 'mixup':
-          advanced_transform = v2.MixUp(num_classes=3)
-        
-        def collate_fn(batch):
-          return advanced_transform(*default_collate(batch))
+          self.advanced_transform = v2.MixUp(num_classes=2)
+        '''
+  
+
 
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
         dataset = SimpleDataset(data_file, transform = transform)
 
-        if aug == 'cutmix' or aug == 'mixup':
-          data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True, collate_fn=collate_fn)       
-        else:
-          data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True) 
+        #if aug == 'cutmix' or aug == 'mixup':
+        #  data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True, collate_fn=self.collate_fn)       
+        #else:
+        data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True) 
 
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
 
@@ -144,8 +157,6 @@ class SetDataManager(DataManager):
         if aug == 'mixup':
           advanced_transform = v2.MixUp(num_classes=self.n_way)
 
-        def collate_fn(batch):
-          return advanced_transform(*default_collate(batch))
 
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
         dataset = SetDataset( data_file , self.batch_size, transform = transform)

@@ -12,6 +12,8 @@ import collections
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
+import torchvision.utils as vutils
+from torchvision.transforms import v2
 import configs
 
 import backbone
@@ -260,3 +262,65 @@ if __name__=='__main__':
               
         else:
           raise ValueError('Unknown method')
+
+    cutmix = v2.CutMix(num_classes=3)
+    mixup = v2.MixUp(num_classes=3)
+    cutmix_or_mixup = v2.RandomChoice([cutmix, mixup])
+    # get a batch of images
+    #images, _ = next(iter(base_loader))
+    #print(images.shape)
+
+    # get a batch of images and labels
+    images, labels = next(iter(base_loader))
+    print(f"Before CutMix/MixUp: {images.shape = }, {labels.shape = }")
+
+    # apply CutMix or MixUp
+    images, labels = cutmix_or_mixup(images, labels)
+    print(f"After CutMix/MixUp: {images.shape = }, {labels.shape = }")
+
+    # create a grid of images
+    grid = vutils.make_grid(images, normalize=True)
+    # grid = vutils.make_grid(images, normalize=True, mean=[0.5, 0.5, 0.5], std=[0.5/255, 0.5/255, 0.5/255])
+
+    # display the grid of images
+    plt.imshow(grid.permute(1,2,0))
+    plt.axis('off')
+    plt.savefig('image.png')
+ 
+
+    '''
+    model = model.cuda()
+
+    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    if params.train_aug:
+        params.checkpoint_dir += '_aug'
+    if params.sn == 'stainnet':
+        params.checkpoint_dir += '_stainnet'
+    if not params.method  in ['baseline', 'baseline++']: 
+        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
+
+    if not os.path.isdir(params.checkpoint_dir):
+        os.makedirs(params.checkpoint_dir)
+
+    start_epoch = params.start_epoch
+    stop_epoch = params.stop_epoch
+   
+
+    if params.resume:
+        resume_file = get_resume_file(params.checkpoint_dir)
+        if resume_file is not None:
+            tmp = torch.load(resume_file)
+            start_epoch = tmp['epoch']+1
+            model.load_state_dict(tmp['state'])
+
+
+    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
+    '''
+
+
+
+
+
+
+
+
