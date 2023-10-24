@@ -16,7 +16,7 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.imaml_idcg import IMAML_IDCG
-from methods.sharpmaml import SharpMAML
+
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file 
 import torch.multiprocessing as mp
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     
     print(f'Applying StainNet stain normalisation......') if params.sn else print()
 
-    assert params.method not in ['maml', 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml'], 'maml variants do not support save_feature and run'
+    assert params.method not in ['maml', 'maml_approx', 'anil', 'imaml_idcg'], 'maml variants do not support save_feature and run'
 
     if 'Conv' in params.model:
       image_size = 84 
@@ -58,70 +58,8 @@ if __name__ == '__main__':
       image_size = 224
 
     split = params.split
-    if params.dataset == 'cross_IDC_4x':
-        if split == 'base':
-            loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-        else:
-            loadfile  = configs.data_dir['BCHI'] + split + '.json'
-    elif params.dataset == 'cross_IDC_10x':
-            if split == 'base':
-                loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-            else:
-                loadfile  = configs.data_dir['BCHI'] + split + '.json'
-    elif params.dataset == 'cross_IDC_20x':
-            if split == 'base':
-                loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-            else:
-                loadfile  = configs.data_dir['BCHI'] + split + '.json'
-    elif params.dataset == 'cross_IDC_40x':
-            if split == 'base':
-                loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-            else:
-                loadfile  = configs.data_dir['BCHI'] + split + '.json'
-
-    elif params.dataset == 'cross_IDC_4x_2':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-      else:
-          loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
-    elif params.dataset == 'cross_IDC_10x_2':
-        if split == 'base':
-            loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-        else:
-            loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
-    elif params.dataset == 'cross_IDC_20x_2':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-      else:
-          loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
-    elif params.dataset == 'cross_IDC_40x_2':
-        if split == 'base':
-            loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-        else:
-            loadfile  = configs.data_dir['PathoIDC_40x'] + split + '.json'
-
-    elif params.dataset == 'cross_IDC_4x_3':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-      else:
-          loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
-    elif params.dataset == 'cross_IDC_10x_3':
-        if split == 'base':
-            loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-        else:
-            loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
-    elif params.dataset == 'cross_IDC_20x_3':
-      if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-      else:
-          loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
-    elif params.dataset == 'cross_IDC_40x_3':
-        if split == 'base':
-            loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-        else:
-            loadfile  = configs.data_dir['PathoIDC_20x'] + split + '.json'
           
-    elif params.dataset == 'long_tail_4x':
+    if params.dataset == 'long_tail_4x':
       if split == 'base':
           loadfile = configs.data_dir['BreaKHis_4x'] + 'base_long.json' 
       else:
@@ -146,10 +84,12 @@ if __name__ == '__main__':
         raise ValueError(f"Unsupported dataset: {params.dataset}")
 
     checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
-    if params.train_aug:
-        checkpoint_dir += '_aug'
-    if params.sn == 'stainnet':
+
+    if params.train_aug :
+        checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
         checkpoint_dir += '_stainnet'
+        
     if not params.method in ['baseline', 'baseline++'] :
         checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
@@ -174,7 +114,7 @@ if __name__ == '__main__':
             model = backbone.Conv6NP()
         else:
             model = model_dict[params.model]( flatten = False )
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']: 
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']: 
        raise ValueError('MAML variants do not support save feature')
     else:
         model = model_dict[params.model]()

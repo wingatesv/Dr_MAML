@@ -26,8 +26,8 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.imaml_idcg import IMAML_IDCG
-from methods.sharpmaml import SharpMAML
-from sam import SAM
+
+
 
 
 import torch.multiprocessing as mp
@@ -40,23 +40,16 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
    
 
     if optimization == 'Adam':
-        # sharpness aware minimisation
-        if params.method  == 'sharpmaml':
-          print('Using SAM Optimizer.....')
-          base_optimizer = torch.optim.Adam 
-          optimizer = SAM(model.parameters(), base_optimizer, lr=0.001)
-
-        else:
-          if hasattr(model, 'task_lr'):
-              learning_rate = 0.00001
-              print(f'With Adaptive Learnable Learning rate, Adam LR:{learning_rate}')
-              model.define_task_lr_params()
-              model_params = list(model.parameters()) + list(model.task_lr.values())
-              optimizer = torch.optim.Adam(model_params, lr=learning_rate)
-          else:
-              learning_rate = 0.0001
-              print(f'With scalar Learning rate, Adam LR:{learning_rate}')
-              optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
+      if hasattr(model, 'task_lr'):
+          learning_rate = 0.00001
+          print(f'With Adaptive Learnable Learning rate, Adam LR:{learning_rate}')
+          model.define_task_lr_params()
+          model_params = list(model.parameters()) + list(model.task_lr.values())
+          optimizer = torch.optim.Adam(model_params, lr=learning_rate)
+      else:
+          learning_rate = 0.0001
+          print(f'With scalar Learning rate, Adam LR:{learning_rate}')
+          optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
 
 
 
@@ -118,69 +111,26 @@ if __name__=='__main__':
     np.random.seed(10)
     params = parse_args('train')
 
-    #  Cross Domain from BreaKHis to BCHI 
-    if params.dataset == 'cross_IDC_4x':
-        base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-        val_file   = configs.data_dir['BCHI'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_10x':
-        base_file = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-        val_file   = configs.data_dir['BCHI'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_20x':
-        base_file = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-        val_file   = configs.data_dir['BCHI'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_40x':
-        base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-        val_file   = configs.data_dir['BCHI'] + 'val.json' 
-
-    #  Cross Domain from BreaKHis to PathoIDC 40x 
-    elif params.dataset == 'cross_IDC_4x_2':
-        base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-        val_file   = configs.data_dir['PathoIDC_40x'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_10x_2':
-            base_file = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-            val_file   = configs.data_dir['PathoIDC_40x'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_20x_2':
-        base_file = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-        val_file   = configs.data_dir['PathoIDC_40x'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_40x_2':
-            base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-            val_file   = configs.data_dir['PathoIDC_40x'] + 'val.json' 
-
-    #  Cross Domain from BreaKHis to PathoIDC 20x 
-    elif params.dataset == 'cross_IDC_4x_3':
-        base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-        val_file   = configs.data_dir['PathoIDC_20x'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_10x_3':
-            base_file = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-            val_file   = configs.data_dir['PathoIDC_20x'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_20x_3':
-        base_file = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-        val_file   = configs.data_dir['PathoIDC_20x'] + 'val.json' 
-    elif params.dataset == 'cross_IDC_40x_3':
-            base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-            val_file   = configs.data_dir['PathoIDC_20x'] + 'val.json' 
 
     #  BreaKHis long tail distribution problem
-    elif params.dataset == 'long_tail_4x':
-        base_file = configs.data_dir['BreaKHis_4x'] + 'base_long.json' 
-        val_file   = configs.data_dir['BreaKHis_4x'] + 'val_long.json' 
-    elif params.dataset == 'long_tail_10x':
-        base_file = configs.data_dir['BreaKHis_10x'] + 'base_long.json' 
-        val_file   = configs.data_dir['BreaKHis_10x'] + 'val_long.json' 
-    elif params.dataset == 'long_tail_20x':
-        base_file = configs.data_dir['BreaKHis_20x'] + 'base_long.json' 
-        val_file   = configs.data_dir['BreaKHis_20x'] + 'val_long.json' 
-    elif params.dataset == 'long_tail_40x':
-        base_file = configs.data_dir['BreaKHis_40x'] + 'base_long.json' 
-        val_file   = configs.data_dir['BreaKHis_40x'] + 'val_long.json' 
+    if params.dataset == 'BreaKHis_4x':
+        base_file = configs.data_dir['BreaKHis_4x'] + 'base.json' 
+        val_file   = configs.data_dir['BreaKHis_4x'] + 'val.json' 
+    elif params.dataset == 'BreaKHis_10x':
+        base_file = configs.data_dir['BreaKHis_10x'] + 'base.json' 
+        val_file   = configs.data_dir['BreaKHis_10x'] + 'val.json' 
+    elif params.dataset == 'BreaKHis_20x':
+        base_file = configs.data_dir['BreaKHis_20x'] + 'base.json' 
+        val_file   = configs.data_dir['BreaKHis_20x'] + 'val.json' 
+    elif params.dataset == 'BreaKHis_40x':
+        base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
+        val_file   = configs.data_dir['BreaKHis_40x'] + 'val.json' 
 
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
          
     if 'Conv' in params.model:
       image_size = 84
-    elif 'EffNet' in params.model:
-      image_size = 480
     else:
       image_size = 224
 
@@ -208,7 +158,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'imaml_idcg']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -238,7 +188,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -256,9 +206,6 @@ if __name__=='__main__':
             feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method)
             model = IMAML_IDCG(  feature_backbone, approx = False , **train_few_shot_params )
 
-
-          elif params.method == 'sharpmaml':
-            model = SharpMAML(  model_dict[params.model], approx = False , **train_few_shot_params )
               
         else:
           raise ValueError('Unknown method')
@@ -288,13 +235,13 @@ if __name__=='__main__':
     plt.savefig('image.png')
  
 
-    '''
+    
     model = model.cuda()
 
     params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
     if params.train_aug:
-        params.checkpoint_dir += '_aug'
-    if params.sn == 'stainnet':
+        params.checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
         params.checkpoint_dir += '_stainnet'
     if not params.method  in ['baseline', 'baseline++']: 
         params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
@@ -315,7 +262,7 @@ if __name__=='__main__':
 
 
     model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
-    '''
+    
 
 
 

@@ -25,7 +25,7 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.imaml_idcg import IMAML_IDCG
-from methods.sharpmaml import SharpMAML
+
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
 
@@ -53,6 +53,7 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
+
     result_dir = configs.ROOT_DIR + '/record' 
     if not os.path.exists(result_dir):
        os.makedirs(result_dir)
@@ -86,7 +87,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -103,11 +104,6 @@ if __name__ == '__main__':
         assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'imaml_idcg do not support non-ImageNet pretrained model'
         feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method )
         model = IMAML_IDCG(  feature_backbone, approx = False , **few_shot_params )
-        # model = IMAML_IDCG(  model_dict[params.model], approx = False , **few_shot_params )
-
-      elif params.method == 'sharpmaml':
-        model = SharpMAML(  model_dict[params.model], approx = False , **few_shot_params )
-
 
     else:
        raise ValueError('Unknown method')
@@ -116,8 +112,8 @@ if __name__ == '__main__':
 
     checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
     if params.train_aug:
-        checkpoint_dir += '_aug'
-    if params.sn == 'stainnet':
+        checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
         checkpoint_dir += '_stainnet'
 
     if not params.method in ['baseline', 'baseline++'] :
@@ -140,84 +136,18 @@ if __name__ == '__main__':
         split_str = split + "_" +str(params.save_iter)
     else:
         split_str = split
-    if params.method in ['maml', 'maml_approx', 'anil', 'imaml_idcg', 'sharpmaml']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'imaml_idcg']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
-        elif 'EffNet' in params.model:
-            image_size = 480 
+  
         else:
             image_size = 224
 
      
         datamgr  = SetDataManager(image_size, n_eposide = iter_num, n_query = 15 , **few_shot_params)
 
-        if params.dataset == 'cross_IDC_4x':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json' 
-        elif params.dataset == 'cross_IDC_10x':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json'
-        elif params.dataset == 'cross_IDC_20x':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json'
-        elif params.dataset == 'cross_IDC_40x':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json'
-
-
-        elif params.dataset == 'cross_IDC_4x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_10x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_20x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_40x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
-
-
-        elif params.dataset == 'cross_IDC_4x_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_10x_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_20x_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_40x_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-
-
-        elif params.dataset == 'long_tail_4x':
+    
+        if params.dataset == 'long_tail_4x':
           if split == 'base':
               loadfile = configs.data_dir['BreaKHis_4x'] + 'base_long.json' 
           else:
