@@ -20,3 +20,5 @@ for index, row in df.iterrows():
     source_path = os.path.join('/content/ISIC2018_Task3_Training_Input', f'{image_name}.jpg')
     destination_path = os.path.join('ISIC2018',image_class, f'{image_name}.jpg')
     shutil.copy(source_path, destination_path)
+
+print('ISIC2018 Data Preparation Done!')
