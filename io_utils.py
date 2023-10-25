@@ -11,18 +11,13 @@ model_dict = dict(
             ResNet18 = backbone.ResNet18,
             ResNet34 = backbone.ResNet34,
             ResNet50 = backbone.ResNet50,
-            ResNet101 = backbone.ResNet101,
-            DenseNet201 = backbone.DenseNet201,
-            DenseNet161 = backbone.DenseNet161,
-            EffNet = backbone.EffNet,
-            MaxVit = backbone.MaxVit,
-            SqueezeNet = backbone.squeezenet)
+            ResNet101 = backbone.ResNet101)
 
 
 
 def parse_args(script):
     parser = argparse.ArgumentParser(description= 'few-shot script %s' %(script))
-    parser.add_argument('--dataset'     , default='BreaKHis_4x',        help='BreaKHis_4x, BreaKHis_10x, BreaKHis_20x, BreaKHis_40x, ISIC, PapSmear')
+    parser.add_argument('--dataset'     , default='BreaKHis_4x',        help='BreaKHis_4x, BreaKHis_10x, BreaKHis_20x, BreaKHis_40x, ISIC, Smear')
     parser.add_argument('--model'       , default='ResNet10',      help='model: Conv{4|6} / ResNet{10|18|34|50|101}') # 50 and 101 are not used in the paper
     parser.add_argument('--method'      , default='baseline',   help='baseline/baseline++/protonet/matchingnet/relationnet{_softmax}/maml{_approx}/anil/imaml_idcg') #relationnet_softmax replace L2 norm with softmax to expedite training, maml_approx use first-order approximation in the gradient for efficiency
     parser.add_argument('--train_n_way' , default=3, type=int,  help='class num to classify for training') #baseline and baseline++ would ignore this parameter

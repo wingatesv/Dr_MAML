@@ -126,6 +126,14 @@ if __name__=='__main__':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
         val_file   = configs.data_dir['BreaKHis_40x'] + 'val.json' 
 
+    elif params.dataset == 'ISIC':
+        base_file = configs.data_dir['ISIC'] + 'base.json' 
+        val_file   = configs.data_dir['ISIC'] + 'val.json' 
+
+    elif params.dataset == 'Smear':
+        base_file = configs.data_dir['Smear'] + 'base.json' 
+        val_file   = configs.data_dir['Smear'] + 'val.json' 
+
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
          
@@ -210,20 +218,20 @@ if __name__=='__main__':
         else:
           raise ValueError('Unknown method')
 
-    cutmix = v2.CutMix(num_classes=3)
-    mixup = v2.MixUp(num_classes=3)
-    cutmix_or_mixup = v2.RandomChoice([cutmix, mixup])
+    # cutmix = v2.CutMix(num_classes=3)
+    # mixup = v2.MixUp(num_classes=3)
+    # cutmix_or_mixup = v2.RandomChoice([cutmix, mixup])
     # get a batch of images
     #images, _ = next(iter(base_loader))
     #print(images.shape)
 
     # get a batch of images and labels
     images, labels = next(iter(base_loader))
-    print(f"Before CutMix/MixUp: {images.shape = }, {labels.shape = }")
+    # print(f"Before CutMix/MixUp: {images.shape = }, {labels.shape = }")
 
-    # apply CutMix or MixUp
-    images, labels = cutmix_or_mixup(images, labels)
-    print(f"After CutMix/MixUp: {images.shape = }, {labels.shape = }")
+    # # apply CutMix or MixUp
+    # images, labels = cutmix_or_mixup(images, labels)
+    # print(f"After CutMix/MixUp: {images.shape = }, {labels.shape = }")
 
     # create a grid of images
     grid = vutils.make_grid(images, normalize=True)
@@ -236,32 +244,32 @@ if __name__=='__main__':
  
 
     
-    model = model.cuda()
+    # model = model.cuda()
 
-    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
-    if params.train_aug:
-        params.checkpoint_dir += f'_{params.train_aug}'
-    if params.sn:
-        params.checkpoint_dir += '_stainnet'
-    if not params.method  in ['baseline', 'baseline++']: 
-        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
+    # params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    # if params.train_aug:
+    #     params.checkpoint_dir += f'_{params.train_aug}'
+    # if params.sn:
+    #     params.checkpoint_dir += '_stainnet'
+    # if not params.method  in ['baseline', 'baseline++']: 
+    #     params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
-    if not os.path.isdir(params.checkpoint_dir):
-        os.makedirs(params.checkpoint_dir)
+    # if not os.path.isdir(params.checkpoint_dir):
+    #     os.makedirs(params.checkpoint_dir)
 
-    start_epoch = params.start_epoch
-    stop_epoch = params.stop_epoch
+    # start_epoch = params.start_epoch
+    # stop_epoch = params.stop_epoch
    
 
-    if params.resume:
-        resume_file = get_resume_file(params.checkpoint_dir)
-        if resume_file is not None:
-            tmp = torch.load(resume_file)
-            start_epoch = tmp['epoch']+1
-            model.load_state_dict(tmp['state'])
+    # if params.resume:
+    #     resume_file = get_resume_file(params.checkpoint_dir)
+    #     if resume_file is not None:
+    #         tmp = torch.load(resume_file)
+    #         start_epoch = tmp['epoch']+1
+    #         model.load_state_dict(tmp['state'])
 
 
-    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
+    # model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
     
 
 

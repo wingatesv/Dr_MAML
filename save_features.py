@@ -59,26 +59,39 @@ if __name__ == '__main__':
 
     split = params.split
           
-    if params.dataset == 'long_tail_4x':
+    if params.dataset == 'BreaKHis_4x':
       if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_4x'] + 'base_long.json' 
+          loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
       else:
-          loadfile  = configs.data_dir['BreaKHis_4x'] + split + '_long.json'
-    elif params.dataset == 'long_tail_10x':
+          loadfile  = configs.data_dir['BreaKHis_4x'] + split + '.json'
+    elif params.dataset == 'BreaKHis_10x':
       if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_10x'] + 'base_long.json' 
+          loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
       else:
-          loadfile  = configs.data_dir['BreaKHis_10x'] + split + '_long.json'
-    elif params.dataset == 'long_tail_20x':
+          loadfile  = configs.data_dir['BreaKHis_10x'] + split + '.json'
+    elif params.dataset == 'BreaKHis_20x':
       if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_20x'] + 'base_long.json' 
+          loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
       else:
-          loadfile  = configs.data_dir['BreaKHis_20x'] + split + '_long.json'
-    elif params.dataset == 'long_tail_40x':
+          loadfile  = configs.data_dir['BreaKHis_20x'] + split + '.json'
+    elif params.dataset == 'BreaKHis_40x':
       if split == 'base':
-          loadfile = configs.data_dir['BreaKHis_40x'] + 'base_long.json' 
+          loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
       else:
-          loadfile  = configs.data_dir['BreaKHis_40x'] + split + '_long.json'
+          loadfile  = configs.data_dir['BreaKHis_40x'] + split + '.json'
+
+    elif params.dataset == 'ISIC':
+      if split == 'base':
+          loadfile = configs.data_dir['ISIC'] + 'base.json' 
+      else:
+          loadfile  = configs.data_dir['ISIC'] + split + '.json'
+
+    elif params.dataset == 'Smear':
+      if split == 'base':
+          loadfile = configs.data_dir['Smear'] + 'base.json' 
+      else:
+          loadfile  = configs.data_dir['Smear'] + split + '.json'
+
 
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")

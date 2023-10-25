@@ -92,8 +92,8 @@ if __name__ == '__main__':
 
     checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model_1, params.method_1)
     if params.train_aug:
-        checkpoint_dir += '_aug'
-    if params.sn == 'stainnet':
+        checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
         checkpoint_dir += '_stainnet'
 
     if not params.method in ['baseline', 'baseline++'] :
@@ -155,8 +155,8 @@ if __name__ == '__main__':
 
     checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model_2, params.method_2)
     if params.train_aug:
-        checkpoint_dir += '_aug'
-    if params.sn == 'stainnet':
+        checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
         checkpoint_dir += '_stainnet'
 
     if not params.method in ['baseline', 'baseline++'] :
@@ -191,77 +191,42 @@ if __name__ == '__main__':
      
         datamgr  = SetDataManager(image_size, n_eposide = iter_num, n_query = 0 , **few_shot_params)
 
-        if params.dataset == 'cross_IDC_4x':
+        if params.dataset == 'BreaKHis_4x':
           if split == 'base':
               loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
           else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json' 
-        elif params.dataset == 'cross_IDC_10x':
+              loadfile  = configs.data_dir['BreaKHis_4x'] + split + '.json'
+        elif params.dataset == 'BreaKHis_10x':
           if split == 'base':
               loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
           else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json'
-        elif params.dataset == 'cross_IDC_20x':
+              loadfile  = configs.data_dir['BreaKHis_10x'] + split + '.json'
+        elif params.dataset == 'BreaKHis_20x':
           if split == 'base':
               loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
           else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json'
-        elif params.dataset == 'cross_IDC_40x':
+              loadfile  = configs.data_dir['BreaKHis_20x'] + split + '.json'
+        elif params.dataset == 'BreaKHis_40x':
           if split == 'base':
               loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
           else:
-              loadfile  = configs.data_dir['BCHI'] + split +'.json'
-              
-        elif params.dataset == 'cross_IDC_4x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_10x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_20x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_40x_2':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_40x'] + split +'.json'
+              loadfile  = configs.data_dir['BreaKHis_40x'] + split + '.json'
 
-        elif params.dataset == 'cross_IDC_4x_3':
+        elif params.dataset == 'ISIC':
           if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_4x'] + 'base.json' 
+              loadfile = configs.data_dir['ISIC'] + 'base.json' 
           else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_10x_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_10x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_20x_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_20x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-        elif params.dataset == 'cross_IDC_40x_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis_40x'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['PathoIDC_20x'] + split +'.json'
-              
-        elif params.dataset == 'cross_IDC_3':
-          if split == 'base':
-              loadfile = configs.data_dir['BreaKHis'] + 'base.json' 
-          else:
-              loadfile  = configs.data_dir['Databiox'] + split +'.json' 
+              loadfile  = configs.data_dir['ISIC'] + split + '.json'
 
-        else:    
-          loadfile  = configs.data_dir[params.dataset] + split + '.json'
+        elif params.dataset == 'Smear':
+          if split == 'base':
+              loadfile = configs.data_dir['Smear'] + 'base.json' 
+          else:
+              loadfile  = configs.data_dir['Smear'] + split + '.json'
+
+
+        else:
+            raise ValueError(f"Unsupported dataset: {params.dataset}")
 
         novel_loader     = datamgr.get_data_loader( loadfile, aug = False, sn = params.sn)
         # get a batch of images
@@ -329,8 +294,8 @@ if __name__ == '__main__':
 
             vis_dir = f'{method_names[i]}_{model_names[i]}'
             if params.train_aug:
-                vis_dir += '_aug'
-            if params.sn == 'stainnet':
+                vis_dir += f'_{params.train_aug}'
+            if params.sn:
                 vis_dir += '_stainnet'
 
             plt.savefig(f'vis_{vis_dir}.png', bbox_inches='tight', pad_inches=0)
