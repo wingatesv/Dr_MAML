@@ -152,8 +152,8 @@ if __name__=='__main__':
         else: # other meta-learning methods
          params.stop_epoch = 100 
 
-    print(f'Applying {params.train_aug} data augmentation ......')
-    print(f'Applying StainNet stain normalisation......') if params.sn else print()
+    print(f'Applying {params.train_aug} Data Augmentation ......')
+    print(f'Applying StainNet stain normalization......') if params.sn else print()
     
     if params.method in ['baseline', 'baseline++'] :
       base_datamgr    = SimpleDataManager(image_size, batch_size = 16)
@@ -201,7 +201,6 @@ if __name__=='__main__':
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
           backbone.ResNet.maml = True
-          backbone.SqueezeNet.maml = True
 
           if params.method in ['maml', 'maml_approx']:
             model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
@@ -218,24 +217,14 @@ if __name__=='__main__':
         else:
           raise ValueError('Unknown method')
 
-    # cutmix = v2.CutMix(num_classes=3)
-    # mixup = v2.MixUp(num_classes=3)
-    # cutmix_or_mixup = v2.RandomChoice([cutmix, mixup])
+
     # get a batch of images
-    #images, _ = next(iter(base_loader))
-    #print(images.shape)
+    images, _ = next(iter(base_loader))
+    print(images.shape)
 
-    # get a batch of images and labels
-    images, labels = next(iter(base_loader))
-    # print(f"Before CutMix/MixUp: {images.shape = }, {labels.shape = }")
-
-    # # apply CutMix or MixUp
-    # images, labels = cutmix_or_mixup(images, labels)
-    # print(f"After CutMix/MixUp: {images.shape = }, {labels.shape = }")
 
     # create a grid of images
     grid = vutils.make_grid(images, normalize=True)
-    # grid = vutils.make_grid(images, normalize=True, mean=[0.5, 0.5, 0.5], std=[0.5/255, 0.5/255, 0.5/255])
 
     # display the grid of images
     plt.imshow(grid.permute(1,2,0))

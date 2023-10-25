@@ -5,8 +5,6 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 from torchvision.transforms import AutoAugment, AutoAugmentPolicy, InterpolationMode, RandAugment, AugMix
-from torchvision.transforms import v2
-from torch.utils.data import default_collate
 import data.additional_transforms as add_transforms
 from data.stainnet_transform import StainNetTransform
 from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
@@ -77,20 +75,20 @@ class TransformLoader:
         elif aug == 'standard':
             transform_list = ['RandomResizedCrop', 'RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
         elif aug == 'auto' and sn:
-            transform_list = ['AutoAugment', 'StainNetTransform', 'ToTensor', 'Normalize']
+            transform_list = ['Resize', 'CenterCrop', 'AutoAugment', 'StainNetTransform', 'ToTensor', 'Normalize']
         elif aug == 'auto':
-            transform_list = ['AutoAugment', 'ToTensor', 'Normalize']
+            transform_list = ['Resize', 'CenterCrop', 'AutoAugment', 'ToTensor', 'Normalize']
         elif aug == 'rand' and sn:
-            transform_list = ['RandAugment', 'StainNetTransform', 'ToTensor', 'Normalize']
+            transform_list = ['Resize', 'CenterCrop', 'RandAugment', 'StainNetTransform', 'ToTensor', 'Normalize']
         elif aug == 'rand':
-            transform_list = ['RandAugment', 'ToTensor', 'Normalize']
+            transform_list = ['Resize', 'CenterCrop', 'RandAugment', 'ToTensor', 'Normalize']
         elif aug == 'augmix' and sn:
-            transform_list = ['AugMix', 'StainNetTransform', 'ToTensor', 'Normalize']
+            transform_list = ['Resize', 'CenterCrop', 'AugMix', 'StainNetTransform', 'ToTensor', 'Normalize']
         elif aug == 'augmix':
-            transform_list = ['AugMix', 'ToTensor', 'Normalize']
-        elif (aug == 'none' or aug == 'cutmix' or aug =='mixup') and sn:
+            transform_list = ['Resize', 'CenterCrop', 'AugMix', 'ToTensor', 'Normalize']
+        elif aug == 'none' and sn:
             transform_list = ['Resize', 'CenterCrop', 'StainNetTransform', 'ToTensor', 'Normalize']
-        elif aug == 'none' or aug == 'cutmix' or aug =='mixup':
+        elif aug == 'none':
             transform_list = ['Resize', 'CenterCrop', 'ToTensor', 'Normalize']
         else:
             raise  ValueError(f"Unsupported augmentation: {aug}")
@@ -113,28 +111,14 @@ class SimpleDataManager(DataManager):
         super(SimpleDataManager, self).__init__()
         self.batch_size = batch_size
         self.trans_loader = TransformLoader(image_size)
-        self.advanced_transform = None
-    '''
-    def collate_fn(self, batch):
-        return self.advanced_transform(*default_collate(batch))
-    '''
+
     
     def get_data_loader(self, data_file, aug, sn): #parameters that would change on train/val set
-        '''
-        if aug == 'cutmix':
-          self.advanced_transform = v2.CutMix(num_classes=2)
-        if aug == 'mixup':
-          self.advanced_transform = v2.MixUp(num_classes=2)
-        '''
-  
-
+        
 
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
         dataset = SimpleDataset(data_file, transform = transform)
 
-        #if aug == 'cutmix' or aug == 'mixup':
-        #  data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True, collate_fn=self.collate_fn)       
-        #else:
         data_loader_params = dict(batch_size = self.batch_size, shuffle = True, num_workers = os.cpu_count(), pin_memory = True) 
 
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
@@ -152,20 +136,14 @@ class SetDataManager(DataManager):
         self.trans_loader = TransformLoader(image_size)
 
     def get_data_loader(self, data_file, aug, sn, cutmix = False, mixup = False): #parameters that would change on train/val set
-        if aug == 'cutmix':
-          advanced_transform = v2.CutMix(num_classes=self.n_way)
-        if aug == 'mixup':
-          advanced_transform = v2.MixUp(num_classes=self.n_way)
-
+        
 
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
         dataset = SetDataset( data_file , self.batch_size, transform = transform)
         sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide )  
 
-        if aug == 'cutmix' or aug == 'mixup':
-          data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True, collate_fn=collate_fn)       
-        else:
-          data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True)       
+      
+        data_loader_params = dict(batch_sampler = sampler,  num_workers = os.cpu_count(), pin_memory = True)       
   
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader

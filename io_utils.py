@@ -23,7 +23,7 @@ def parse_args(script):
     parser.add_argument('--train_n_way' , default=3, type=int,  help='class num to classify for training') #baseline and baseline++ would ignore this parameter
     parser.add_argument('--test_n_way'  , default=3, type=int,  help='class num to classify for testing (validation) ') #baseline and baseline++ only use this parameter in finetuning
     parser.add_argument('--n_shot'      , default=1, type=int,  help='number of labeled data in each class, same as n_support') #baseline and baseline++ only use this parameter in finetuning
-    parser.add_argument('--train_aug'   , default='none', type=str, help='perform data augmentation or not during training, aug: none, standard, auto, rand, augmix, cutmix or mixup') #still required for save_features.py and test.py to find the model path correctly
+    parser.add_argument('--train_aug'   , default='none', type=str, help='perform data augmentation or not during training, aug: none, standard, auto, rand, augmix') #still required for save_features.py and test.py to find the model path correctly
     parser.add_argument('--sn'   , action='store_true', help='Apply StainNet Stain Normalization')
 
 
