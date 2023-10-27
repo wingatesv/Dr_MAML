@@ -136,7 +136,14 @@ if __name__=='__main__':
 
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
-         
+
+    # Set number of classes for baseline training
+    if params.dataset == 'Smear' or params.dataset == 'ISIC':
+      params.num_classes = 4
+    else:
+      params.num_classes = 5
+
+    # Set Image Size  
     if 'Conv' in params.model:
       image_size = 84
     else:
