@@ -13,3 +13,8 @@ Time: 20231027-030132, Setting: Smear-novel-Conv4-matchingnet-aug 1shot 3way_tra
 Time: 20231027-030318, Setting: Smear-novel-Conv4-baseline++-aug 1shot 3way_test, Acc: 600 Test Acc = 45.78% ± 0.93% 
 Time: 20231027-030744, Setting: Smear-novel-Conv4-baseline++-aug 1shot 3way_test, Acc: 600 Test Acc = 45.11% ± 0.84% 
 Time: 20231027-031208, Setting: Smear-novel-Conv4-baseline++-aug 5shot 3way_test, Acc: 600 Test Acc = 51.42% ± 1.02% 
+Time: 20231027-033633, Setting: Smear-novel-Conv4-baseline-aug 1shot 3way_test, Acc: 600 Test Acc = 44.13% ± 0.89% 
+Time: 20231027-034009, Setting: Smear-novel-Conv4-baseline-aug 5shot 3way_test, Acc: 600 Test Acc = 53.91% ± 1.23% 
+Time: 20231027-040545, Setting: Smear-novel-Conv4-baseline++-aug 1shot 3way_test, Acc: 600 Test Acc = 49.01% ± 0.98% 
+Time: 20231027-041014, Setting: Smear-novel-Conv4-baseline++-aug 5shot 3way_test, Acc: 600 Test Acc = 54.76% ± 1.13% 
+Time: 20231027-054253, Setting: Smear-novel-Conv4-relationnet-standard 1shot 3way_train 3way_test, Acc: 600 Test Acc = 54.29% ± 1.09% 
