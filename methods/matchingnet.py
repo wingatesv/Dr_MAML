@@ -20,7 +20,7 @@ class MatchingNet(MetaTemplate):
         self.G_encoder = nn.LSTM(self.feat_dim, self.feat_dim, 1, batch_first=True, bidirectional=True)
 
         self.relu = nn.ReLU()
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=1)
 
     def encode_training_set(self, S, G_encoder = None):
         if G_encoder is None:
@@ -74,7 +74,7 @@ class FullyContextualEmbedding(nn.Module):
     def __init__(self, feat_dim):
         super(FullyContextualEmbedding, self).__init__()
         self.lstmcell = nn.LSTMCell(feat_dim*2, feat_dim)
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=1)
         self.c_0 = Variable(torch.zeros(1,feat_dim))
         self.feat_dim = feat_dim
         #self.K = K

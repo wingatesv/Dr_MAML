@@ -12,8 +12,8 @@ import collections
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-import torchvision.utils as vutils
-from torchvision.transforms import v2
+# import torchvision.utils as vutils
+
 import configs
 
 import backbone
@@ -147,10 +147,10 @@ if __name__=='__main__':
 
     if params.stop_epoch == -1: 
         if params.method in ['baseline', 'baseline++'] :
-            params.stop_epoch = 50
+            params.stop_epoch = 200
      
         else: # other meta-learning methods
-         params.stop_epoch = 100 
+         params.stop_epoch = 400 
 
     print(f'Applying {params.train_aug} Data Augmentation ......')
     print(f'Applying StainNet stain normalization......') if params.sn else print()
@@ -219,46 +219,46 @@ if __name__=='__main__':
 
 
     # get a batch of images
-    images, _ = next(iter(base_loader))
-    print(images.shape)
+    # images, _ = next(iter(base_loader))
+    # print(images.shape)
 
 
-    # create a grid of images
-    grid = vutils.make_grid(images, normalize=True)
+    # # create a grid of images
+    # grid = vutils.make_grid(images, normalize=True)
 
-    # display the grid of images
-    plt.imshow(grid.permute(1,2,0))
-    plt.axis('off')
-    plt.savefig('image.png')
+    # # display the grid of images
+    # plt.imshow(grid.permute(1,2,0))
+    # plt.axis('off')
+    # plt.savefig('image.png')
  
 
     
-    # model = model.cuda()
+    model = model.cuda()
 
-    # params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
-    # if params.train_aug:
-    #     params.checkpoint_dir += f'_{params.train_aug}'
-    # if params.sn:
-    #     params.checkpoint_dir += '_stainnet'
-    # if not params.method  in ['baseline', 'baseline++']: 
-    #     params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
+    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    if params.train_aug:
+        params.checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
+        params.checkpoint_dir += '_stainnet'
+    if not params.method  in ['baseline', 'baseline++']: 
+        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
-    # if not os.path.isdir(params.checkpoint_dir):
-    #     os.makedirs(params.checkpoint_dir)
+    if not os.path.isdir(params.checkpoint_dir):
+        os.makedirs(params.checkpoint_dir)
 
-    # start_epoch = params.start_epoch
-    # stop_epoch = params.stop_epoch
+    start_epoch = params.start_epoch
+    stop_epoch = params.stop_epoch
    
 
-    # if params.resume:
-    #     resume_file = get_resume_file(params.checkpoint_dir)
-    #     if resume_file is not None:
-    #         tmp = torch.load(resume_file)
-    #         start_epoch = tmp['epoch']+1
-    #         model.load_state_dict(tmp['state'])
+    if params.resume:
+        resume_file = get_resume_file(params.checkpoint_dir)
+        if resume_file is not None:
+            tmp = torch.load(resume_file)
+            start_epoch = tmp['epoch']+1
+            model.load_state_dict(tmp['state'])
 
 
-    # model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
+    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
     
 
 

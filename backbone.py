@@ -6,7 +6,9 @@ import torch.nn as nn
 import math
 import numpy as np
 import torch.nn.functional as F
-from torch.nn.utils.weight_norm import WeightNorm
+# from torch.nn.utils.weight_norm import WeightNorm
+from torch.nn.utils.parametrizations import weight_norm as WeightNorm
+
 import torchvision.models as models
 import torch.nn.init as init
 
@@ -27,8 +29,8 @@ class distLinear(nn.Module):
         self.L = nn.Linear( indim, outdim, bias = False)
         self.class_wise_learnable_norm = True  #See the issue#4&8 in the github 
         if self.class_wise_learnable_norm:      
-            WeightNorm.apply(self.L, 'weight', dim=0) #split the weight update component to direction and norm      
-
+            # WeightNorm.apply(self.L, 'weight', dim=0) #split the weight update component to direction and norm      
+            self.L = WeightNorm(self.L, name='weight', dim=0)
         if outdim <=200:
             self.scale_factor = 2; #a fixed scale factor to scale the output of cos value into a reasonably large input for softmax, for to reproduce the result of CUB with ResNet10, use 4. see the issue#31 in the github 
         else:

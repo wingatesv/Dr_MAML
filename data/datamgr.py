@@ -71,9 +71,9 @@ class TransformLoader:
 
     def get_composed_transform(self, aug=None, sn=False):
         if aug == 'standard' and sn:
-            transform_list = ['RandomResizedCrop', 'StainNetTransform', 'RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
+            transform_list = ['RandomResizedCrop', 'StainNetTransform', 'ImageJitter', 'RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
         elif aug == 'standard':
-            transform_list = ['RandomResizedCrop', 'RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
+            transform_list = ['RandomResizedCrop', 'ImageJitter', 'RandomVerticalFlip', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
         elif aug == 'auto' and sn:
             transform_list = ['Resize', 'CenterCrop', 'AutoAugment', 'StainNetTransform', 'ToTensor', 'Normalize']
         elif aug == 'auto':

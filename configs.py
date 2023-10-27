@@ -1,6 +1,6 @@
 ROOT_DIR = '/content/Dr_MAML'
 
-save_dir = ROOT_DIR + '/best_model'
+save_dir = '/content/drive/MyDrive/PhD/Dr_MAML/best_model'
 data_dir = {}
 data_dir['BreaKHis_4x']  = ROOT_DIR + '/filelists/BreaKHis_4x/' 
 data_dir['BreaKHis_10x']  = ROOT_DIR + '/filelists/BreaKHis_10x/' 
