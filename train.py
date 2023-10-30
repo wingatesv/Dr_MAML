@@ -122,7 +122,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     print(f"Total Training Time: {elapsed_hours:.2f} h") # print elapsed time for current epoch in hours
 
 
-    plt.plot(range(start_epoch, stop_epoch), val_acc)
+    plt.plot(range(len(val_acc), val_acc)
     plt.xlabel('Epoch')
     plt.ylabel('Validation Accuracy')
     plt.savefig(f'{params.checkpoint_dir}_val_acc.png')
