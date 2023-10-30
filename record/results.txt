@@ -18,3 +18,4 @@ Time: 20231027-034009, Setting: Smear-novel-Conv4-baseline-aug 5shot 3way_test, 
 Time: 20231027-040545, Setting: Smear-novel-Conv4-baseline++-aug 1shot 3way_test, Acc: 600 Test Acc = 49.01% ± 0.98% 
 Time: 20231027-041014, Setting: Smear-novel-Conv4-baseline++-aug 5shot 3way_test, Acc: 600 Test Acc = 54.76% ± 1.13% 
 Time: 20231027-054253, Setting: Smear-novel-Conv4-relationnet-standard 1shot 3way_train 3way_test, Acc: 600 Test Acc = 54.29% ± 1.09% 
+Time: 20231030-021155, Setting: BreaKHis_4x-novel-Conv4-relationnet-standard 1shot 3way_train 3way_test, Acc: 600 Test Acc = 37.18% ± 0.65% 

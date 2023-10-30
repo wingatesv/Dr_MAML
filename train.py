@@ -35,7 +35,7 @@ from io_utils import model_dict, parse_args, get_resume_file
 
 
 
-def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params):    
+def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
 
    
 
@@ -62,6 +62,12 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     scheduler = None
     # scheduler = lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=(stop_epoch-start_epoch), eta_min=0.0001)
 
+    # Initialize early stopping variables
+    patience = int(patience_ratio * (stop_epoch - start_epoch))
+    warmup_epochs = int(warmup_epochs_ratio * (stop_epoch - start_epoch))
+    early_stopping_counter = 0
+
+
 
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
@@ -77,11 +83,25 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
             print("best model! save...")
             max_acc = acc
+            early_stopping_counter = 0
             outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
             if hasattr(model, 'task_lr'):
                 torch.save({'epoch':epoch, 'state':model.state_dict(), 'task_lr': model.task_lr}, outfile)
             else:
                 torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+
+        elif acc == -1: #for baseline and baseline++
+          pass
+
+        else:
+          # Skip early stopping check during warm-up period
+          if epoch >= warmup_epochs:
+               early_stopping_counter += 1
+
+        # If validation accuracy hasn't improved for patience epochs, increase patience
+        if early_stopping_counter >= patience and epoch >= warmup_epochs:
+            print(f"Early stopping at epoch {epoch}")
+            break
 
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
