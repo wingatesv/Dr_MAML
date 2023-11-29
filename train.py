@@ -181,6 +181,7 @@ if __name__=='__main__':
         else: # other meta-learning methods
          params.stop_epoch = 200 
 
+    print('Dataset: ', params.dataset)
     print(f'Applying {params.train_aug} Data Augmentation ......')
     print(f'Applying StainNet stain normalization......') if params.sn else print()
     
