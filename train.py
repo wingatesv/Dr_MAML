@@ -51,17 +51,17 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
           optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
          
-   elif optimization == 'Ranger':
+    elif optimization == 'Ranger':
       if hasattr(model, 'task_lr'):
           learning_rate = 0.00001
-          print(f'With Adaptive Learnable Learning rate, Adam LR:{learning_rate}')
+          print(f'With Adaptive Learnable Learning rate, Ranger LR:{learning_rate}')
           model.define_task_lr_params()
           model_params = list(model.parameters()) + list(model.task_lr.values())
-          optimizer = Ranger21(model_params, lr=learning_rate, num_epochs=range(start_epoch,stop_epoch), num_batches_per_epoch=len(base_loader))
+          optimizer = Ranger21(model_params, lr=learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
       else:
           learning_rate = 0.0001
-          print(f'With scalar Learning rate, Adam LR:{learning_rate}')
-          optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=range(start_epoch,stop_epoch), num_batches_per_epoch=len(base_loader))
+          print(f'With scalar Learning rate, Ranger LR:{learning_rate}')
+          optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
 
 
 
