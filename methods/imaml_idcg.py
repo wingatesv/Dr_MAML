@@ -14,7 +14,7 @@ from collections import OrderedDict
 
 
 class IMAML_IDCG(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, approx = False):
+    def __init__(self, model_func,  n_way, n_support, approx = True):
         super(IMAML_IDCG, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
