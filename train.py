@@ -185,7 +185,7 @@ if __name__=='__main__':
       image_size = 224
 
 
-    optimization =  params.optimization
+    optimization =  params.optimizer
 
     if params.stop_epoch == -1: 
         if params.method in ['baseline', 'baseline++'] :
