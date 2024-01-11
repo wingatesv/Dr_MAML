@@ -12,6 +12,7 @@ import collections
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from ranger21 import Ranger21
+from torchtools.optim import RangerLars # Over9000
 # import torchvision.utils as vutils
 
 import configs
@@ -62,6 +63,18 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           learning_rate = 0.0001
           print(f'With scalar Learning rate, Ranger LR:{learning_rate}')
           optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
+         
+   elif optimization == 'RangerLars':
+      if hasattr(model, 'task_lr'):
+          learning_rate = 0.00001
+          print(f'With Adaptive Learnable Learning rate, RangerLars LR:{learning_rate}')
+          model.define_task_lr_params()
+          model_params = list(model.parameters()) + list(model.task_lr.values())
+          optimizer = RangerLars(model_params, lr=learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
+      else:
+          learning_rate = 0.0001
+          print(f'With scalar Learning rate, RangerLars LR:{learning_rate}')
+          optimizer = RangerLars(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
 
 
 
