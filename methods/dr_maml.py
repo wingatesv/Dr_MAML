@@ -11,13 +11,14 @@ from tqdm import tqdm
 import torch.optim as optim
 from collections import OrderedDict
 
+from losses import SupConLoss
 
-
-class IMAML_IDCG(MetaTemplate):
+class DR_MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = True):
-        super(IMAML_IDCG, self).__init__( model_func,  n_way, n_support, change_way = False)
+        super(DR_MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
+        self.supcon_loss = SupConLoss(temperature=0.07,)
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         
@@ -35,10 +36,10 @@ class IMAML_IDCG(MetaTemplate):
     def forward(self,x):
         out  = self.feature.forward(x)
         scores  = self.classifier.forward(out)
-        return scores
+        return out, scores
 
     def set_forward(self,x, is_feature = False):
-        assert is_feature == False, 'IMAML_IDCG do not support fixed feature' 
+        assert is_feature == False, 'DR_MAML do not support fixed feature' 
         
         x = x.cuda()
         x_var = Variable(x)
@@ -53,7 +54,7 @@ class IMAML_IDCG(MetaTemplate):
 
 
         for task_step in range(self.task_update_num): 
-            scores = self.forward(x_a_i)
+            out, scores = self.forward(x_a_i)
             set_loss = self.loss_fn( scores, y_a_i) 
             grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
             if self.approx:
@@ -74,7 +75,7 @@ class IMAML_IDCG(MetaTemplate):
         return scores
 
     def set_forward_adaptation(self,x, is_feature = False): #overwrite parrent function
-        raise ValueError('ANIL performs further adapation simply by increasing task_upate_num')
+        raise ValueError('DR_MAML performs further adapation simply by increasing task_upate_num')
 
 
     def set_forward_loss(self, x):
