@@ -11,9 +11,8 @@ import math
 import collections
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from ranger21 import Ranger21
-from torchtools.optim import RangerLars # Over9000
-# import torchvision.utils as vutils
+from torchtools.optim import RangerLars, Ranger, Novograd 
+
 
 import configs
 
@@ -58,11 +57,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           print(f'With Adaptive Learnable Learning rate, Ranger LR:{learning_rate}')
           model.define_task_lr_params()
           model_params = list(model.parameters()) + list(model.task_lr.values())
-          optimizer = Ranger21(model_params, lr=learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
+          optimizer = Ranger(model_params, lr=learning_rate)
       else:
           learning_rate = 0.0001
           print(f'With scalar Learning rate, Ranger LR:{learning_rate}')
-          optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
+          optimizer = Ranger(model.parameters(), lr = learning_rate)
          
    elif optimization == 'RangerLars':
       if hasattr(model, 'task_lr'):
@@ -70,11 +69,23 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           print(f'With Adaptive Learnable Learning rate, RangerLars LR:{learning_rate}')
           model.define_task_lr_params()
           model_params = list(model.parameters()) + list(model.task_lr.values())
-          optimizer = RangerLars(model_params, lr=learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
+          optimizer = RangerLars(model_params, lr=learning_rate)
       else:
           learning_rate = 0.0001
           print(f'With scalar Learning rate, RangerLars LR:{learning_rate}')
-          optimizer = RangerLars(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
+          optimizer = RangerLars(model.parameters(), lr = learning_rate)
+         
+   elif optimization == 'Novograd':
+      if hasattr(model, 'task_lr'):
+          learning_rate = 0.00001
+          print(f'With Adaptive Learnable Learning rate, Novograd LR:{learning_rate}')
+          model.define_task_lr_params()
+          model_params = list(model.parameters()) + list(model.task_lr.values())
+          optimizer = Novograd(model_params, lr=learning_rate)
+      else:
+          learning_rate = 0.0001
+          print(f'With scalar Learning rate, RangerLars LR:{learning_rate}')
+          optimizer = Novograd(model.parameters(), lr = learning_rate)
 
 
 
