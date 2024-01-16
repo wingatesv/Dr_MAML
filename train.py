@@ -63,7 +63,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           print(f'With scalar Learning rate, Ranger LR:{learning_rate}')
           optimizer = Ranger(model.parameters(), lr = learning_rate)
          
-   elif optimization == 'RangerLars':
+    elif optimization == 'RangerLars':
       if hasattr(model, 'task_lr'):
           learning_rate = 0.00001
           print(f'With Adaptive Learnable Learning rate, RangerLars LR:{learning_rate}')
@@ -75,7 +75,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           print(f'With scalar Learning rate, RangerLars LR:{learning_rate}')
           optimizer = RangerLars(model.parameters(), lr = learning_rate)
          
-   elif optimization == 'Novograd':
+    elif optimization == 'Novograd':
       if hasattr(model, 'task_lr'):
           learning_rate = 0.00001
           print(f'With Adaptive Learnable Learning rate, Novograd LR:{learning_rate}')
