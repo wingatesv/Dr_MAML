@@ -162,3 +162,37 @@ class FSLSupConLoss(nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
+
+
+class ModifiedSupervisedContrastiveLoss(nn.Module):
+    def __init__(self, temperature=0.5):
+        super(ModifiedSupervisedContrastiveLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(self, features, labels):
+        # Ensure features tensor is [batch_size, n_views, feature_dim]
+        if len(features.shape) < 3:
+            features = features.unsqueeze(1)
+
+        batch_size, n_views, _ = features.shape
+        features = features.view(batch_size * n_views, -1)
+
+        mask = torch.eye(batch_size * n_views).to(features.device)
+
+        # Compute similarity
+        sim = torch.mm(features, features.t().contiguous()) / self.temperature
+        sim_max, _ = torch.max(sim, dim=1, keepdim=True)
+        sim = sim - sim_max.detach()
+        sim = sim - mask * 1e9
+        sim = sim.softmax(dim=1)
+
+        # Compute ground truth
+        labels = labels.repeat(n_views, 1).view(-1, 1)
+        target_mask = (labels == labels.t()).float().to(features.device)
+        target_mask = target_mask - mask * 1e9
+        target = target_mask.softmax(dim=1)
+
+        # Compute contrastive loss
+        loss = -(target * sim.log()).sum(dim=1).mean()
+        return loss
+
