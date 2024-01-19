@@ -1,5 +1,11 @@
 class SupervisedContrastiveLoss(nn.Module):
-    def __init__(self, temperature=0.1):
+
+    '''
+    Usage:
+    self.supconloss  = SupervisedContrastiveLoss()
+    con_loss = self.supconloss( F.normalize(out, dim=1), y_a_i)
+    '''
+    def __init__(self, temperature=0.5):
         super(SupervisedContrastiveLoss, self).__init__()
         self.temperature = temperature
 
@@ -19,12 +25,16 @@ class SupervisedContrastiveLoss(nn.Module):
         target = target_mask.softmax(dim=1)
 
         # Compute contrastive loss
-        loss = -(target * sim.log()).sum(dim=1).mean()
+        eps = 1e-7
+        loss = -(target * (sim + eps).log()).sum(dim=1).mean()
+        # loss = -(target * sim.log()).sum(dim=1).mean()
         return loss
 
 import torch
 import torch.nn.functional as F
-
+'''
+Not working
+'''
 def supervised_contrastive_loss(features, n_support):
     batch_size = features.size(0)
     n_samples = features.size(1)
@@ -42,6 +52,64 @@ def supervised_contrastive_loss(features, n_support):
     loss_sup_con = -torch.log(numerator / denominator).mean()
 
     return loss_sup_con
+
+class FSLSupConLoss(nn.Module):
+    def __init__(self, temperature=0.5):
+        super(FSLSupConLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(self, features, labels):
+        device = (torch.device('cuda') if features.is_cuda else torch.device('cpu'))
+
+        # Ensure features tensor is [batch_size, n_views, feature_dim]
+        if len(features.shape) < 3:
+            features = features.unsqueeze(1)
+
+        batch_size = features.shape[0]
+        labels = labels.contiguous().view(-1, 1)
+        if labels.shape[0] != batch_size:
+            raise ValueError('Num of labels does not match num of features')
+
+        # Create a mask for positive pairs
+        mask = torch.eq(labels, labels.T).float().to(device)
+
+        contrast_count = features.shape[1]
+        contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0)
+
+        anchor_feature = contrast_feature
+        anchor_count = contrast_count
+
+        # Compute logits
+        anchor_dot_contrast = torch.div(
+            torch.matmul(anchor_feature, contrast_feature.T),
+            self.temperature)
+        # For numerical stability
+        logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
+        logits = anchor_dot_contrast - logits_max.detach()
+
+        # Tile mask
+        mask = mask.repeat(anchor_count, contrast_count)
+        # Mask-out self-contrast cases
+        logits_mask = torch.scatter(
+            torch.ones_like(mask),
+            1,
+            torch.arange(batch_size * anchor_count).view(-1, 1).to(device),
+            0
+        )
+        mask = mask * logits_mask
+
+        # Compute log_prob
+        exp_logits = torch.exp(logits) * logits_mask
+        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
+
+        # Compute mean of log-likelihood over positive
+        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+
+        # Loss
+        loss = - mean_log_prob_pos
+        loss = loss.view(anchor_count, batch_size).mean()
+
+        return loss
 
 class CTMLoss(nn.Module):
     def __init__(self):
