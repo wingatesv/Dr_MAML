@@ -28,7 +28,7 @@ class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False):
         super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
-        self.supconloss = FSLSupConLoss()
+        self.supconloss = FSLSupConLoss(temperature = 0.5)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
@@ -61,8 +61,14 @@ class MAML(MetaTemplate):
         x_b_i = x_var[:,self.n_support:,:,:,:].contiguous().view( self.n_way* self.n_query,   *x.size()[2:]) #query data
         y_a_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_support ) )).cuda() #label for support data
         
-        fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
-        for weight in self.parameters():
+        fast_parameters = [param for name, param in self.named_parameters() if 'hyperparameter_generator' not in name]#the first gradient calcuated in line 45 is based on original weight
+        for weight in fast_parameters:
+            weight.fast = None
+        self.zero_grad()
+
+        # Get all parameters except those in self.classifier
+        fast_feature_parameters = [param for name, param in self.named_parameters() if 'classifier' not in name and 'hyperparameter_generator' not in name]
+        for weight in fast_feature_parameters:
             weight.fast = None
         self.zero_grad()
 
@@ -74,20 +80,26 @@ class MAML(MetaTemplate):
             # print('Con loss: ',con_loss.item())
             ce_loss = self.loss_fn( scores, y_a_i) 
 
+          
             # Compute the layer-wise means of gradients and weights
-            gradients = torch.autograd.grad(outputs=con_loss, inputs=self.parameters(), create_graph=True)
-            tau = torch.stack([torch.mean(g) for g in gradients + list(self.parameters())])
+            gradients = torch.autograd.grad(outputs=con_loss, inputs=fast_feature_parameters, create_graph=True)
+            mean_gradients = torch.mean(torch.stack([torch.mean(g) for g in gradients]))
+            mean_weights = torch.mean(torch.stack([torch.mean(p) for p in fast_feature_parameters]))
+            tau = torch.cat([mean_gradients.unsqueeze(0), mean_weights.unsqueeze(0)], dim=0)
+        
 
             # Generate the task-adaptive hyperparameter
             self.beta = self.hyperparameter_generator(tau) * self.beta
+            # print('Tau: ', tau)
             print('Beta: ' ,self.beta)
 
             total_loss = ce_loss + self.beta * con_loss
+            
             grad = torch.autograd.grad(total_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
             if self.approx:
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
             fast_parameters = []
-            for k, weight in enumerate(self.parameters()):
+            for k, weight in enumerate(param for name, param in self.named_parameters() if 'hyperparameter_generator' not in name):
                 #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                 if weight.fast is None:
                     weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
