@@ -75,7 +75,7 @@ class MAML(MetaTemplate):
             ce_loss = self.loss_fn( scores, y_a_i) 
 
             # Compute the layer-wise means of gradients and weights
-            gradients = torch.autograd.grad(outputs=loss_sup_con, inputs=self.parameters(), create_graph=True)
+            gradients = torch.autograd.grad(outputs=con_loss, inputs=self.parameters(), create_graph=True)
             tau = torch.stack([torch.mean(g) for g in gradients + list(self.parameters())])
 
             # Generate the task-adaptive hyperparameter
