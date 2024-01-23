@@ -80,7 +80,7 @@ class MAML(MetaTemplate):
         for task_step in range(self.task_update_num): 
             out, scores = self.forward(x_a_i)
 
-            con_loss = self.supconloss( F.normalize(out, dim=1), y_a_i)
+            con_loss = self.supconloss( F.normalize(out, dim=1).unsqueeze(1), y_a_i)
             # print('Con loss: ',con_loss.item())
             set_loss = self.loss_fn( scores, y_a_i) 
             total_loss = con_loss + set_loss
