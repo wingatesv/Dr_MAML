@@ -41,7 +41,7 @@ class MAML(MetaTemplate):
         # self.scale_factor = 2
         # self.scale_factor = nn.Parameter(torch.ones(1) * 10)  # Initialize scale_factor as a learnable parameter
 
-        self.hyperparameter_generator = HyperParameterGenerator(input_dim = 1, hidden_dim = 2)
+        self.hyperparameter_generator = HyperParameterGenerator(input_dim = 2, hidden_dim = 32)
         self.beta = torch.ones(1).cuda()  # initial proportion beta
 
 
