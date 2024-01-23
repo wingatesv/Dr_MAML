@@ -8,40 +8,15 @@ import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
-# from losses import FSLSupConLoss
+from losses import FSLSupConLoss
 
 
-class SupervisedContrastiveLoss(nn.Module):
-    def __init__(self, temperature=0.5):
-        super(SupervisedContrastiveLoss, self).__init__()
-        self.temperature = temperature
-
-    def forward(self, features, labels):
-        batch_size = features.size(0)
-        mask = torch.eye(batch_size).to(features.device)
-
-        # Compute similarity
-        sim = torch.mm(features, features.t().contiguous()) / self.temperature
-        sim = sim - mask * 1e9
-        sim = sim.softmax(dim=1)
-
-        # Compute ground truth
-        labels = labels.unsqueeze(1)
-        target_mask = (labels == labels.t()).float().to(features.device)
-        target_mask = target_mask - mask * 1e9
-        target = target_mask.softmax(dim=1)
-
-        # Compute contrastive loss
-        eps = 1e-7
-        loss = -(target * (sim + eps).log()).sum(dim=1).mean()
-        # loss = -(target * sim.log()).sum(dim=1).mean()
-        return loss
 
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False):
         super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
-        self.supconloss = SupervisedContrastiveLoss()
+        self.supconloss = FSLSupConLoss()
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
