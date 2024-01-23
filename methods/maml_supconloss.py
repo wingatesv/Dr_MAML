@@ -10,6 +10,18 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from losses import FSLSupConLoss
 
+class HyperParameterGenerator(nn.Module):
+    def __init__(self, input_dim, hidden_dim):
+        super(HyperParameterGenerator, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, 1)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = torch.sigmoid(self.fc3(x))
+        return x
 
 
 class MAML(MetaTemplate):
@@ -28,6 +40,9 @@ class MAML(MetaTemplate):
         self.inner_loop_steps_list  = []  
         # self.scale_factor = 2
         # self.scale_factor = nn.Parameter(torch.ones(1) * 10)  # Initialize scale_factor as a learnable parameter
+
+        self.hyperparameter_generator = HyperParameterGenerator(input_dim = 1, hidden_dim = 2)
+        self.beta = torch.ones(1).cuda()  # initial proportion beta
 
 
 
@@ -57,8 +72,17 @@ class MAML(MetaTemplate):
 
             con_loss = self.supconloss( F.normalize(out, dim=1).unsqueeze(1), y_a_i)
             # print('Con loss: ',con_loss.item())
-            set_loss = self.loss_fn( scores, y_a_i) 
-            total_loss = con_loss + set_loss
+            ce_loss = self.loss_fn( scores, y_a_i) 
+
+            # Compute the layer-wise means of gradients and weights
+            gradients = torch.autograd.grad(outputs=loss_sup_con, inputs=self.parameters(), create_graph=True)
+            tau = torch.stack([torch.mean(g) for g in gradients + list(self.parameters())])
+
+            # Generate the task-adaptive hyperparameter
+            self.beta = self.hyperparameter_generator(tau) * self.beta
+            print('Beta: ' ,self.beta)
+
+            total_loss = ce_loss + self.beta * con_loss
             grad = torch.autograd.grad(total_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
             if self.approx:
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
