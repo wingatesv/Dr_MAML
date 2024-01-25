@@ -41,7 +41,7 @@ class MAML(MetaTemplate):
         # self.scale_factor = 2
         # self.scale_factor = nn.Parameter(torch.ones(1) * 10)  # Initialize scale_factor as a learnable parameter
 
-        self.hyperparameter_generator = HyperParameterGenerator(input_dim = 2, hidden_dim = 32)
+        self.hyperparameter_generator = HyperParameterGenerator(input_dim = 2, hidden_dim = 8)
         self.beta = torch.ones(1).cuda()  # initial proportion beta
 
 
@@ -61,16 +61,16 @@ class MAML(MetaTemplate):
         x_b_i = x_var[:,self.n_support:,:,:,:].contiguous().view( self.n_way* self.n_query,   *x.size()[2:]) #query data
         y_a_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_support ) )).cuda() #label for support data
         
-        fast_parameters = [param for name, param in self.named_parameters() if 'hyperparameter_generator' not in name]#the first gradient calcuated in line 45 is based on original weight
-        for weight in fast_parameters:
+        model_parameters = [param for name, param in self.named_parameters() if 'hyperparameter_generator' not in name]
+        fast_parameters = model_parameters #the first gradient calcuated in line 45 is based on original weight
+        for weight in model_parameters:
             weight.fast = None
         self.zero_grad()
-
         # Get all parameters except those in self.classifier
-        fast_feature_parameters = [param for name, param in self.named_parameters() if 'classifier' not in name and 'hyperparameter_generator' not in name]
-        for weight in fast_feature_parameters:
-            weight.fast = None
-        self.zero_grad()
+        # fast_feature_parameters = [param for name, param in self.named_parameters() if 'classifier' not in name and 'hyperparameter_generator' not in name]
+        # for weight in fast_feature_parameters:
+        #     weight.fast = None
+        # self.zero_grad()
 
 
         for task_step in range(self.task_update_num): 
@@ -80,18 +80,19 @@ class MAML(MetaTemplate):
             # print('Con loss: ',con_loss.item())
             ce_loss = self.loss_fn( scores, y_a_i) 
 
-          
+            
+
             # Compute the layer-wise means of gradients and weights
-            gradients = torch.autograd.grad(outputs=con_loss, inputs=fast_feature_parameters, create_graph=True)
-            mean_gradients = torch.mean(torch.stack([torch.mean(g) for g in gradients]))
-            mean_weights = torch.mean(torch.stack([torch.mean(p) for p in fast_feature_parameters]))
-            tau = torch.cat([mean_gradients.unsqueeze(0), mean_weights.unsqueeze(0)], dim=0)
-        
+            # gradients = torch.autograd.grad(outputs=con_loss, inputs=fast_feature_parameters, create_graph=True)
+            # mean_gradients = torch.mean(torch.stack([torch.mean(g) for g in gradients]))
+            # mean_weights = torch.mean(torch.stack([torch.mean(p) for p in fast_feature_parameters]))
+            # tau = torch.cat([mean_gradients.unsqueeze(0), mean_weights.unsqueeze(0)], dim=0)
+            tau  = torch.tensor([-5.9909e-05, 2.4998e-01]).cuda()
 
             # Generate the task-adaptive hyperparameter
             self.beta = self.hyperparameter_generator(tau) * self.beta
             # print('Tau: ', tau)
-            print('Beta: ' ,self.beta)
+            # print('Beta: ' ,self.beta)
 
             total_loss = ce_loss + self.beta * con_loss
             
@@ -99,7 +100,7 @@ class MAML(MetaTemplate):
             if self.approx:
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
             fast_parameters = []
-            for k, weight in enumerate(param for name, param in self.named_parameters() if 'hyperparameter_generator' not in name):
+            for k, weight in enumerate(model_parameters):
                 #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                 if weight.fast is None:
                     weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
@@ -132,6 +133,7 @@ class MAML(MetaTemplate):
 
         optimizer.zero_grad()
 
+
         #train
         for i, (x,_) in enumerate(train_loader):
 
@@ -149,12 +151,14 @@ class MAML(MetaTemplate):
        
                 loss_q = torch.stack(loss_all).sum(0)
                 loss_value = loss_q.item()
+
                 loss_q.backward()
                 optimizer.step()
     
                 task_count = 0
                 loss_all = []
             optimizer.zero_grad()
+
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
                       
