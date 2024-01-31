@@ -10,26 +10,29 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from losses import FSLSupConLoss
 
-class HyperParameterGenerator(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
-        super(HyperParameterGenerator, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.fc3 = nn.Linear(hidden_dim, 1)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = torch.sigmoid(self.fc3(x))
-        return x
-
+class CTMLoss(nn.Module):
+    def __init__(self):
+        super(CTMLoss, self).__init__()
+       
+    def forward(self, query_set, y_true):
+        # Calculate the probability that the query sample belongs to class c
+        p_y = F.softmax(query_set, dim=1)
+        
+        # Create a mask for the 0-1 indicator function
+        mask = (y_true.unsqueeze(1) == torch.arange(p_y.size(1)).unsqueeze(0).to(y_true.device)).float()
+        
+        # Compute CTM loss according to the formula provided in the image
+        loss = -torch.sum(mask * torch.log(p_y)) / y_true.size(0)
+        
+        return loss
 
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False):
         super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
-        self.supconloss = FSLSupConLoss(temperature = 0.5)
+        self.supconloss = FSLSupConLoss()
         self.loss_fn = nn.CrossEntropyLoss()
+        self.ctm_loss = CTMLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         
@@ -39,17 +42,19 @@ class MAML(MetaTemplate):
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
         # self.scale_factor = 2
-        # self.scale_factor = nn.Parameter(torch.ones(1) * 10)  # Initialize scale_factor as a learnable parameter
+        # self.scale_factor = nn.Parameter(torch.ones(1) * 5, requires_grad=True)  # Initialize scale_factor as a learnable parameter
 
-        self.hyperparameter_generator = HyperParameterGenerator(input_dim = 2, hidden_dim = 8)
-        self.beta = torch.ones(1).cuda()  # initial proportion beta
+        # self.hyperparameter_generator = HyperParameterGenerator(input_dim = 2, hidden_dim = 32)
+        # self.beta = torch.ones(1).cuda()  # initial proportion beta
+        self.beta = nn.Parameter(torch.ones(1), requires_grad=True)
 
 
 
     def forward(self,x):
         out  = self.feature.forward(x)
         scores  = self.classifier.forward(out)
-        return out, scores
+        # print('Scale Factor: ',self.scale_factor)
+        return out, scores 
         # return scores * self.scale_factor
 
     def set_forward(self,x, is_feature = False):
@@ -61,17 +66,11 @@ class MAML(MetaTemplate):
         x_b_i = x_var[:,self.n_support:,:,:,:].contiguous().view( self.n_way* self.n_query,   *x.size()[2:]) #query data
         y_a_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_support ) )).cuda() #label for support data
         
-        model_parameters = [param for name, param in self.named_parameters() if 'hyperparameter_generator' not in name]
+        model_parameters = [param for param in self.parameters() if param is not self.beta]
         fast_parameters = model_parameters #the first gradient calcuated in line 45 is based on original weight
         for weight in model_parameters:
             weight.fast = None
         self.zero_grad()
-        # Get all parameters except those in self.classifier
-        # fast_feature_parameters = [param for name, param in self.named_parameters() if 'classifier' not in name and 'hyperparameter_generator' not in name]
-        # for weight in fast_feature_parameters:
-        #     weight.fast = None
-        # self.zero_grad()
-
 
         for task_step in range(self.task_update_num): 
             out, scores = self.forward(x_a_i)
@@ -80,20 +79,7 @@ class MAML(MetaTemplate):
             # print('Con loss: ',con_loss.item())
             ce_loss = self.loss_fn( scores, y_a_i) 
 
-            
-
-            # Compute the layer-wise means of gradients and weights
-            # gradients = torch.autograd.grad(outputs=con_loss, inputs=fast_feature_parameters, create_graph=True)
-            # mean_gradients = torch.mean(torch.stack([torch.mean(g) for g in gradients]))
-            # mean_weights = torch.mean(torch.stack([torch.mean(p) for p in fast_feature_parameters]))
-            # tau = torch.cat([mean_gradients.unsqueeze(0), mean_weights.unsqueeze(0)], dim=0)
-            tau  = torch.tensor([-5.9909e-05, 2.4998e-01]).cuda()
-
-            # Generate the task-adaptive hyperparameter
-            self.beta = self.hyperparameter_generator(tau) * self.beta
-            # print('Tau: ', tau)
-            # print('Beta: ' ,self.beta)
-
+            # print('Beta: ', self.beta.item())
             total_loss = ce_loss + self.beta * con_loss
             
             grad = torch.autograd.grad(total_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
@@ -101,28 +87,33 @@ class MAML(MetaTemplate):
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
             fast_parameters = []
             for k, weight in enumerate(model_parameters):
-                #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                if weight.fast is None:
-                    weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
-                else:
-                    weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
-                fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
-
+              #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+              if weight.fast is None:
+                  weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
+              else:
+                  weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+              fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
 
         # feed forward query data
         out, scores = self.forward(x_b_i)
-        return scores
+        return out, scores
 
     def set_forward_adaptation(self,x, is_feature = False): #overwrite parrent function
         raise ValueError('MAML performs further adapation simply by increasing task_upate_num')
 
 
     def set_forward_loss(self, x):
-        scores = self.set_forward(x, is_feature = False)
+        out, scores = self.set_forward(x, is_feature = False)
         y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
-        loss = self.loss_fn(scores, y_b_i)
+        
+        ce_loss = self.loss_fn(scores, y_b_i)
+        
+        ctm_loss = self.ctm_loss(out, y_b_i)
+        # print('CTM loss: ', ctm_loss)
 
-        return loss
+        total_loss = ctm_loss + ce_loss
+
+        return total_loss
 
 
     def train_loop(self, epoch, train_loader, optimizer): #overwrite parrent function
@@ -132,7 +123,6 @@ class MAML(MetaTemplate):
         loss_all = []
 
         optimizer.zero_grad()
-
 
         #train
         for i, (x,_) in enumerate(train_loader):
@@ -151,14 +141,12 @@ class MAML(MetaTemplate):
        
                 loss_q = torch.stack(loss_all).sum(0)
                 loss_value = loss_q.item()
-
                 loss_q.backward()
                 optimizer.step()
     
                 task_count = 0
                 loss_all = []
             optimizer.zero_grad()
-
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
                       
