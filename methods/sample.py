@@ -465,3 +465,30 @@ class DALoss(nn.Module):
             final_loss += loss * weight
         return final_loss
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2, reduction="none"):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha # The scalar factor for this criterion
+        self.gamma = gamma # The exponent of the modulating factor
+        self.reduction = reduction # The reduction option for the output
+
+    def forward(self, inputs, targets):
+        # Compute the softmax probability
+        p = F.softmax(inputs, dim=1)
+        # Select the probability of the true class
+        p_t = p.gather(1, targets.unsqueeze(1)).squeeze(1)
+        # Compute the focal loss
+        loss = -self.alpha * (1 - p_t) ** self.gamma * torch.log(p_t)
+        # Apply the reduction option
+        if self.reduction == "none":
+            return loss
+        elif self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        else:
+            raise ValueError(f"Invalid value for reduction: {self.reduction}")
