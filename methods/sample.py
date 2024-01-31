@@ -158,6 +158,25 @@ def cross_task_metric_loss(model, support_set, query_set):
     loss_ctm *= torch.sum(class_probabilities[torch.arange(len(query_set)), query_set[:, 1]])
 
     return loss_ctm
+
+
+class CTMLoss(nn.Module):
+    def __init__(self):
+        super(CTMLoss, self).__init__()
+
+    def forward(self, query_set, y_true):
+        # Calculate the probability that the query sample belongs to class c
+        p_y = F.softmax(query_set, dim=1)
+        
+        # Create a mask for the 0-1 indicator function
+        mask = (y_true.unsqueeze(1) == torch.arange(p_y.size(1)).unsqueeze(0)).float()
+        
+        # Compute CTM loss according to the formula provided in the image
+        loss = -torch.sum(mask * torch.log(p_y)) / y_true.size(0)
+        
+        return loss
+
+
 class HyperParameterGenerator(nn.Module):
     def __init__(self):
         super(HyperParameterGenerator, self).__init__()
