@@ -426,3 +426,42 @@ def outer_loop_optimization_loss(model, gamma, main_task_query_set, auxiliary_ta
     loss_outer = gamma * loss_ce_main_task + (1 - gamma) * loss_ctm_auxiliary_tasks
 
     return loss_outer
+
+outputs = model(inputs)
+loss = nn.CrossEntropyLoss()(outputs, labels)
+
+# Compute difficulty-aware loss
+epsilon = 1e-8  # Small constant to prevent log blow up
+da_loss = -loss * torch.log(torch.max(torch.tensor(epsilon), 1 - loss))
+
+# Backward pass and optimization
+da_loss.backward()
+optimizer.step()
+
+import torch
+import torch.nn as nn
+
+class DALoss(nn.Module):
+    def __init__(self, alpha=0.1, beta=1.0):
+        super(DALoss, self).__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.mse = nn.MSELoss(reduction='none')
+
+    def forward(self, outputs, targets):
+        # outputs and targets are lists of tensors, one for each task
+        losses = []
+        weights = []
+        for output, target in zip(outputs, targets):
+            # calculate the task-specific loss
+            loss = self.mse(output, target).mean()
+            losses.append(loss)
+            # calculate the difficulty weight
+            weight = 1 / (self.alpha + self.beta * loss)
+            weights.append(weight)
+        # multiply the loss by the weight and sum them up
+        final_loss = 0
+        for loss, weight in zip(losses, weights):
+            final_loss += loss * weight
+        return final_loss
+
