@@ -438,6 +438,12 @@ da_loss = -loss * torch.log(torch.max(torch.tensor(epsilon), 1 - loss))
 da_loss.backward()
 optimizer.step()
 
+n = # Assign a value to n based on your requirement
+epsilon = 1e-8  # Small constant to prevent log blow up
+da_loss = -loss**n * torch.log(torch.max(torch.tensor(epsilon), 1 - loss))
+loss_all.append(da_loss)
+
+
 import torch
 import torch.nn as nn
 
