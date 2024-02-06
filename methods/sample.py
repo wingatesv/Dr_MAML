@@ -564,3 +564,34 @@ class FocalLoss(nn.Module):
         else:
             loss = batch_loss.sum()
         return loss
+
+
+class MAML(nn.Module):
+    # ... existing code ...
+
+    def __init__(self, ...):  # add your existing parameters here
+        # ... existing code ...
+        self.task_update_num_initial = 5
+        self.task_update_num_final = 2
+        self.current_epoch = 0
+        self.last_task_update_num = self.task_update_num_initial
+
+    def set_epoch(self, epoch):
+        self.current_epoch = epoch
+
+    def set_forward(self, x, is_feature=False):
+        assert is_feature == False, 'MAML do not support fixed feature' 
+        
+        # ... existing code ...
+
+        # Calculate task_update_num based on current epoch
+        annealing_rate = 0.01  # adjust this value based on your needs
+        self.task_update_num = max(self.task_update_num_final, self.task_update_num_initial - annealing_rate * self.current_epoch)
+
+        # Print task_update_num if it has changed
+        if self.task_update_num != self.last_task_update_num:
+            print(f"task_update_num has changed to: {self.task_update_num}")
+            self.last_task_update_num = self.task_update_num
+
+        for task_step in range(int(self.task_update_num)): 
+            # ... existing code ...
