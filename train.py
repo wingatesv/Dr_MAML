@@ -141,7 +141,12 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
 if __name__=='__main__':
     mp.set_start_method('spawn')
-    np.random.seed(10)
+    seed = 10
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
     params = parse_args('train')
 
 
