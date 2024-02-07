@@ -595,3 +595,12 @@ class MAML(nn.Module):
 
         for task_step in range(int(self.task_update_num)): 
             # ... existing code ...
+
+
+
+seed=0
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
