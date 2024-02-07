@@ -609,3 +609,47 @@ if epoch_num % 2 == 0:
     self.approx = False  # Use second order calculation
 else:
     self.approx = True
+
+
+import torch
+from torch import nn
+from torchvision.models import vgg16
+
+class NANet(nn.Module):
+    def __init__(self, num_classes=3):
+        super(NANet, self).__init__()
+        # Load the pretrained VGG16 network
+        vgg = vgg16(pretrained=True)
+        
+        # Use the features part of VGG16 for both the main and guide branches
+        self.main_branch = vgg.features
+        self.guide_branch = vgg.features
+        
+        # Add a guide block (1x1 convolution) to each convolutional layer in the guide branch
+        for i, layer in enumerate(self.guide_branch):
+            if isinstance(layer, nn.Conv2d):
+                self.guide_branch[i] = nn.Sequential(
+                    layer,
+                    nn.Conv2d(layer.out_channels, layer.out_channels, kernel_size=1)
+                )
+        
+        # The fully connected layer takes the concatenated output of the two branches
+        self.fc = nn.Linear(512 * 7 * 7 * 2, num_classes)
+
+    def forward(self, x):
+        # Forward pass through the main and guide branches
+        main_out = self.main_branch(x)
+        guide_out = self.guide_branch(x)
+        
+        # Flatten the output of each branch
+        main_out = main_out.view(main_out.size(0), -1)
+        guide_out = guide_out.view(guide_out.size(0), -1)
+        
+        # Concatenate the output of the two branches
+        out = torch.cat((main_out, guide_out), dim=1)
+        
+        # Forward pass through the fully connected layer
+        out = self.fc(out)
+        
+        return out
+
