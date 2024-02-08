@@ -104,7 +104,7 @@ class SupConLoss(nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
-
+# result not good with temp=0.07
 class FSLSupConLoss(nn.Module):
     def __init__(self, temperature=0.5):
         super(FSLSupConLoss, self).__init__()
