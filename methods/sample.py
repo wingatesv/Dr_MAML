@@ -571,8 +571,8 @@ class MAML(nn.Module):
 
     def __init__(self, ...):  # add your existing parameters here
         # ... existing code ...
-        self.task_update_num_initial = 5
-        self.task_update_num_final = 2
+        self.task_update_num_initial = 6
+        self.task_update_num_final = 1
         self.current_epoch = 0
         self.last_task_update_num = self.task_update_num_initial
 
@@ -585,11 +585,11 @@ class MAML(nn.Module):
         # ... existing code ...
 
         # Calculate task_update_num based on current epoch
-        annealing_rate = 0.01  # adjust this value based on your needs
-        self.task_update_num = max(self.task_update_num_final, self.task_update_num_initial - annealing_rate * self.current_epoch)
+        annealing_rate = 0.05  # adjust this value based on your needs
+        self.task_update_num = int(max(self.task_update_num_final, self.task_update_num_initial - annealing_rate * self.current_epoch))
 
         # Print task_update_num if it has changed
-        if self.task_update_num != self.last_task_update_num:
+        if self.task_update_num != int(self.last_task_update_num):
             print(f"task_update_num has changed to: {self.task_update_num}")
             self.last_task_update_num = self.task_update_num
 
