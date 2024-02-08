@@ -193,6 +193,7 @@ class ModifiedSupervisedContrastiveLoss(nn.Module):
         target = target_mask.softmax(dim=1)
 
         # Compute contrastive loss
-        loss = -(target * sim.log()).sum(dim=1).mean()
+        eps = 1e-7
+        loss = -(target * (sim + eps).log()).sum(dim=1).mean()
         return loss
 
