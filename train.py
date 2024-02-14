@@ -31,7 +31,7 @@ from methods.anil import ANIL
 
 
 import torch.multiprocessing as mp
-from io_utils import model_dict, parse_args, get_resume_file  
+from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
 
 
@@ -141,12 +141,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
 if __name__=='__main__':
     mp.set_start_method('spawn')
-    seed = 10
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
+   
+    # set a fixed seed for reproducibility 
+    set_seed(seed=10)
+
+    # get the training argument parser
     params = parse_args('train')
 
 
