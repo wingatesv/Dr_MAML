@@ -3,6 +3,8 @@ import os
 import glob
 import argparse
 import backbone
+import torch
+import random
 
 model_dict = dict(
             Conv4 = backbone.Conv4,
@@ -81,3 +83,13 @@ def get_best_file(checkpoint_dir):
         return best_file
     else:
         return get_resume_file(checkpoint_dir)
+
+def set_seed(seed=10):
+            random.seed(seed)
+            os.environ['PYTHONHASHSEED'] = str(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+            torch.backends.cudnn.benchmark = False
+            torch.backends.cudnn.deterministic = True
