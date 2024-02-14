@@ -27,7 +27,7 @@ from methods.anil import ANIL
 # from methods.imaml_idcg import IMAML_IDCG
 
 
-from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
+from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file, set_seed
 
 
 def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 15, adaptation = False):
@@ -54,12 +54,8 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
     
-    seed=10
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
+    # set a fixed seed for reproducibility 
+    set_seed(seed=10)
     
     result_dir = configs.ROOT_DIR + '/record' 
     if not os.path.exists(result_dir):
