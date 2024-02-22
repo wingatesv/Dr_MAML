@@ -653,3 +653,35 @@ class NANet(nn.Module):
         
         return out
 
+
+import torch
+from torch.autograd import Variable
+import torchvision.transforms as transforms
+
+def set_forward(self,x, is_feature = False):
+    assert is_feature == False, 'MAML do not support fixed feature' 
+
+    x = x.cuda()
+    x_var = Variable(x)
+    x_a_i = x_var[:,:self.n_support,:,:,:].contiguous().view( self.n_way* self.n_support, *x.size()[2:]) #support data 
+    x_b_i = x_var[:,self.n_support:,:,:,:].contiguous().view( self.n_way* self.n_query,   *x.size()[2:]) #query data
+    y_a_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_support ) )).cuda() #label for support data
+
+    # Clone the support data and labels
+    x_a_i_clone = x_a_i.clone()
+    y_a_i_clone = y_a_i.clone()
+
+    # Define the augmentation (Random Erasing)
+    augmentation = transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3), value=0, inplace=False)
+
+    # Apply the augmentation to the cloned support data
+    x_a_i_clone = x_a_i_clone.cpu()
+    x_a_i_clone = augmentation(x_a_i_clone)
+    x_a_i_clone = x_a_i_clone.cuda()
+
+    # Concatenate the augmented data and labels back to the original data and labels
+    x_a_i_augmented = torch.cat((x_a_i, x_a_i_clone), dim=0)
+    y_a_i_augmented = torch.cat((y_a_i, y_a_i_clone), dim=0)
+
+    return x_a_i_augmented, y_a_i_augmented, x_b_i
+
