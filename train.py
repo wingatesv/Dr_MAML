@@ -26,19 +26,11 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 # from methods.imaml_idcg import IMAML_IDCG
-
-
-
-
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
 
-
 def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
-
-   
-
     if optimization == 'Adam':
       if hasattr(model, 'task_lr'):
           learning_rate = 0.00001
@@ -79,7 +71,6 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     early_stopping_counter = 0
 
 
-
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
         model.train()
@@ -91,6 +82,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
         acc = model.test_loop(val_loader)
         val_acc.append(acc)
+
+         # Save validation accuracy and training time to a text file
+        with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
+          log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}\n')
+
         if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
             print("best model! save...")
             max_acc = acc
@@ -133,10 +129,10 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     print(f"Total Training Time: {elapsed_hours:.2f} h") # print elapsed time for current epoch in hours
 
 
-    plt.plot(range(len(val_acc)), val_acc)
-    plt.xlabel('Epoch')
-    plt.ylabel('Validation Accuracy')
-    plt.savefig(f'{params.checkpoint_dir}_val_acc.png')
+    # Save final training times to a text file
+    with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'w') as time_file:
+        time_file.write(f'Epoch: {epoch}, Training Time: {elapsed_hours:.4f} seconds\n')
+
     return model
 
 if __name__=='__main__':
