@@ -25,6 +25,7 @@ class ANNEMAML(MetaTemplate):
         self.inner_loop_steps_list  = []  
 
         # annealing parameters
+        print(f'Annealing params: {annealing_type}-{task_update_num_initial}-{task_update_num_final}-{annealing_rate}\n')
         self.annealing_type = annealing_type
         self.annealing_rate = annealing_rate  
         self.task_update_num_initial = task_update_num_initial
