@@ -232,7 +232,10 @@ if __name__=='__main__':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
 
           elif params.method == 'annemaml':
-            
+            if params.anneal_param != 'none':
+                anneal_params = params.anneal_param.split('-')
+            else:
+                raise ValueError('Unknown Annealing Parameters')
             anneal_params =  params.anneal_param.split('-') if params.anneal_param != 'none' else raise ValueError('Unknown Annealing Parameters')
             model = ANNEMAML(  model_dict[params.model], 
                              annealing_type = str(anneal_params[0]), 
