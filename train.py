@@ -25,37 +25,20 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
-# from methods.imaml_idcg import IMAML_IDCG
+from methods.anneal_maml import ANNEMAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
 
 def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
+    learning_rate = 0.0001
     if optimization == 'Adam':
-      if hasattr(model, 'task_lr'):
-          learning_rate = 0.00001
-          print(f'With Adaptive Learnable Learning rate, Adam LR:{learning_rate}')
-          model.define_task_lr_params()
-          model_params = list(model.parameters()) + list(model.task_lr.values())
-          optimizer = torch.optim.Adam(model_params, lr=learning_rate)
-      else:
-          learning_rate = 0.0001
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
           optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
          
     elif optimization == 'Ranger21':
-      if hasattr(model, 'task_lr'):
-          learning_rate = 0.00001
-          print(f'With Adaptive Learnable Learning rate, Ranger21 LR:{learning_rate}')
-          model.define_task_lr_params()
-          model_params = list(model.parameters()) + list(model.task_lr.values())
-          optimizer = Ranger21(model_params, lr=learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
-      else:
-          learning_rate = 0.0001
           print(f'With scalar Learning rate, Ranger21 LR:{learning_rate}')
-          optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))
-         
-    
+          optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))   
     else:
        raise ValueError('Unknown optimization, please define by yourself')
   
@@ -182,7 +165,6 @@ if __name__=='__main__':
     else:
       image_size = 224
 
-
     optimization =  params.optimizer
 
     if params.stop_epoch == -1: 
@@ -207,7 +189,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'imaml_idcg']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -237,7 +219,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -249,10 +231,15 @@ if __name__=='__main__':
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
 
-          # elif params.method == 'imaml_idcg':
-          #   assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'imaml_idcg do not support non-ImageNet pretrained model'
-          #   feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method)
-          #   model = IMAML_IDCG(  feature_backbone, approx = False , **train_few_shot_params )
+          elif params.method == 'annemaml':
+            anneal_params = params.anneal_param.split('-')
+            model = ANNEMAML(  model_dict[params.model], 
+                             annealing_type = str(anneal_params[0]), 
+                             task_update_num_initial = int(anneal_params[1]), 
+                             task_update_num_final = int(anneal_params[2]), 
+                             annealing_rate = float(anneal_params[3]), 
+                             approx = False , 
+                             **train_few_shot_params )
 
               
         else:
