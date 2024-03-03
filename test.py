@@ -24,7 +24,7 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
-# from methods.imaml_idcg import IMAML_IDCG
+from methods.anneal_maml import ANNEMAML
 
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file, set_seed
@@ -90,7 +90,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -103,10 +103,15 @@ if __name__ == '__main__':
       elif params.method == 'anil':
         model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
 
-      elif params.method == 'imaml_idcg':
-        assert params.model not in ['Conv4', 'Conv6','Conv4NP', 'Conv6NP', 'ResNet10'], 'imaml_idcg do not support non-ImageNet pretrained model'
-        feature_backbone = lambda: model_dict[params.model]( flatten = True, method = params.method )
-        model = IMAML_IDCG(  feature_backbone, approx = False , **few_shot_params )
+      elif params.method == 'annemaml':     
+        anneal_params =  params.anneal_param.split('-') if params.anneal_param != 'none' else raise ValueError('Unknown Annealing Parameters')
+        model = ANNEMAML(  model_dict[params.model], 
+                         annealing_type = str(anneal_params[0]), 
+                         task_update_num_initial = int(anneal_params[1]), 
+                         task_update_num_final = int(anneal_params[2]), 
+                         annealing_rate = float(anneal_params[3]), 
+                         approx = False , 
+                     **few_shot_params )
 
     else:
        raise ValueError('Unknown method')
@@ -116,6 +121,8 @@ if __name__ == '__main__':
     checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
     if params.train_aug:
         checkpoint_dir += f'_{params.train_aug}'
+    if params.anneal_param != 'none':
+        checkpoint_dir += f'_{params.anneal_param}'
     if params.sn:
         checkpoint_dir += '_stainnet'
 
@@ -139,7 +146,7 @@ if __name__ == '__main__':
         split_str = split + "_" +str(params.save_iter)
     else:
         split_str = split
-    if params.method in ['maml', 'maml_approx', 'anil', 'imaml_idcg']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
@@ -211,6 +218,7 @@ if __name__ == '__main__':
     with open(os.path.join(result_dir, 'results.txt') , 'a') as f:
         timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime()) 
         aug_str = f'-{params.train_aug}' if params.train_aug else '-none'
+        aug_str += f'-{params.anneal_param}' if params.anneal_param != 'none' else '-none'
         aug_str += '-adapted' if params.adaptation else ''
         if params.method in ['baseline', 'baseline++'] :
             exp_setting = '%s-%s-%s-%s%s %sshot %sway_test' %(params.dataset, split_str, params.model, params.method, aug_str, params.n_shot, params.test_n_way )
