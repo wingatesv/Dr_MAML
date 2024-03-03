@@ -27,7 +27,7 @@ def parse_args(script):
     parser.add_argument('--n_shot'      , default=1, type=int,  help='number of labeled data in each class, same as n_support') #baseline and baseline++ only use this parameter in finetuning
     parser.add_argument('--train_aug'   , default='none', type=str, help='perform data augmentation or not during training, aug: none, standard, auto, rand, augmix') #still required for save_features.py and test.py to find the model path correctly
     parser.add_argument('--sn'   , action='store_true', help='Apply StainNet Stain Normalization')
-    parser.add_argument('--anneal_param'   , default='lin-5-1-0.05', type=str, help='Annealing parameters')
+    parser.add_argument('--anneal_param'   , default='none', type=str, help='Annealing parameters')
 
 
 
