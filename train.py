@@ -232,7 +232,8 @@ if __name__=='__main__':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
 
           elif params.method == 'annemaml':
-            anneal_params = params.anneal_param.split('-')
+            
+            anneal_params =  params.anneal_param.split('-') if params.anneal_param != 'none' else raise ValueError('Unknown Annealing Parameters')
             model = ANNEMAML(  model_dict[params.model], 
                              annealing_type = str(anneal_params[0]), 
                              task_update_num_initial = int(anneal_params[1]), 
@@ -268,6 +269,8 @@ if __name__=='__main__':
         params.checkpoint_dir += f'_{params.train_aug}'
     if params.sn:
         params.checkpoint_dir += '_stainnet'
+    if params.anneal_param != 'none':
+        params.checkpoint_dir += f'_{params.anneal_param}'
     if not params.method  in ['baseline', 'baseline++']: 
         params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
