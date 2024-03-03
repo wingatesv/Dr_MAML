@@ -10,37 +10,66 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 
 
-class MAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, approx = False):
-        super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
+class ANNEMAML(MetaTemplate):
+    def __init__(self, model_func,  n_way, n_support, annealing_rate, task_update_num_initial, task_update_num_final, annealing_type, approx = False):
+        super(ANNEMAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         
         self.n_task     = 4 #meta-batch, meta update every meta batch
-        # self.task_update_num = 5
+        self.task_update_num = 0
         self.train_lr = 0.01 #this is the inner loop learning rate
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
 
-        self.task_update_num_initial = 6
-        self.task_update_num_final = 1
+        # annealing parameters
+        self.annealing_type = annealing_type
+        self.annealing_rate = annealing_rate  
+        self.task_update_num_initial = task_update_num_initial
+        self.task_update_num_final = task_update_num_final
         self.current_epoch = 0
         self.last_task_update_num = self.task_update_num_initial
-
-
-
+      
     def forward(self,x):
         out  = self.feature.forward(x)
         scores  = self.classifier.forward(out)
         return scores
 
+    def annealing_type(task_update_num_final, task_update_num_initial, annealing_rate, current_epoch, atype=None):
+      period = 150 // 3 # let the trapezoid has shorter shape
+      if atype == 'con':
+        return task_update_num_initial
+      # linear step
+      elif atype == 'lin':
+        return int(max(task_update_num_final, task_update_num_initial - annealing_rate * current_epoch))
+      # exp sten
+      elif atype == 'exp':
+        return int(max(task_update_num_final, task_update_num_initial * np.exp(-annealing_rate * current_epoch)))
+      # cosine step
+      elif atype == 'cos':
+        return int(max(task_update_num_final, task_update_num_initial * np.cos(annealing_rate * current_epoch)))
+      # sigmoid step
+      elif atype == 'sig':
+        return int(max(task_update_num_final, task_update_num_initial / (1 + np.exp(annealing_rate * (current_epoch - epochs / 2)))))  
+      # trapezoid step
+      elif atype == 'tra':
+        if current_epoch < period:
+          # Increase linearly
+          return  int(task_update_num_final + (task_update_num_initial - task_update_num_final) * current_epoch / period)
+        elif current_epoch < 2 * period:
+            # Stay at maximum
+            return int(task_update_num_initial)
+        else:
+            # Decrease linearly
+            return int(task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - 2 * period) / period)
+    
     def set_epoch(self, epoch):
         self.current_epoch = epoch
 
     def set_forward(self,x, is_feature = False):
-        assert is_feature == False, 'MAML do not support fixed feature' 
+        assert is_feature == False, 'ANNEMAML do not support fixed feature' 
         
         x = x.cuda()
         x_var = Variable(x)
@@ -54,8 +83,9 @@ class MAML(MetaTemplate):
         self.zero_grad()
 
         # Calculate task_update_num based on current epoch
-        annealing_rate = 0.05  # adjust this value based on your needs
-        self.task_update_num = int(max(self.task_update_num_final, self.task_update_num_initial - annealing_rate * self.current_epoch))
+        self.task_update_num = self.annealing_type(self.task_update_num_final, self.task_update_num_initial, self.annealing_rate, self.current_epoch, atype=self.annealing_type)
+        
+        # self.task_update_num = int(max(self.task_update_num_final, self.task_update_num_initial -  self.annealing_rate * self.current_epoch))
 
         # Print task_update_num if it has changed
         if self.task_update_num != int(self.last_task_update_num):
@@ -83,7 +113,7 @@ class MAML(MetaTemplate):
         return scores
 
     def set_forward_adaptation(self,x, is_feature = False): #overwrite parrent function
-        raise ValueError('MAML performs further adapation simply by increasing task_upate_num')
+        raise ValueError('ANNEMAML performs further adapation simply by increasing task_upate_num')
 
 
     def set_forward_loss(self, x):
