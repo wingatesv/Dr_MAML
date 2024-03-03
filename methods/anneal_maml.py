@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 class ANNEMAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, annealing_rate, task_update_num_initial, task_update_num_final, annealing_type, approx = False):
+    def __init__(self, model_func,  n_way, n_support, annealing_rate = None, task_update_num_initial = None, task_update_num_final = None, annealing_type = None, approx = False):
         super(ANNEMAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
