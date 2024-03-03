@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
-
+import math
 
 class ANNEMAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, annealing_rate = None, approx = False):
@@ -44,27 +44,27 @@ class ANNEMAML(MetaTemplate):
         return task_update_num_initial
       # linear step
       elif atype == 'lin':
-        return int(max(task_update_num_final, task_update_num_initial - annealing_rate * current_epoch))
+        return int(math.ceil(max(task_update_num_final, task_update_num_initial - annealing_rate * current_epoch)))
       # exp sten
       elif atype == 'exp':
-        return int(max(task_update_num_final, task_update_num_initial * np.exp(-annealing_rate * current_epoch)))
+        return int(math.ceil(max(task_update_num_final, task_update_num_initial * np.exp(-annealing_rate * current_epoch))))
       # cosine step
       elif atype == 'cos':
-        return int(max(task_update_num_final, task_update_num_initial * np.cos(annealing_rate * current_epoch)))
+        return int(math.ceil(max(task_update_num_final, task_update_num_initial * np.cos(annealing_rate * current_epoch))))
       # sigmoid step
       elif atype == 'sig':
-        return int(max(task_update_num_final, task_update_num_initial / (1 + np.exp(annealing_rate * (current_epoch - epochs / 2)))))  
+        return int(math.ceil(max(task_update_num_final, task_update_num_initial / (1 + np.exp(annealing_rate * (current_epoch - epochs / 2))))))  
       # trapezoid step
       elif atype == 'tra':
         if current_epoch < period:
           # Increase linearly
-          return  int(task_update_num_final + (task_update_num_initial - task_update_num_final) * current_epoch / period)
+          return  int(math.ceil(task_update_num_final + (task_update_num_initial - task_update_num_final) * current_epoch / period))
         elif current_epoch < 2 * period:
             # Stay at maximum
             return int(task_update_num_initial)
         else:
             # Decrease linearly
-            return int(task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - 2 * period) / period)
+            return int(math.ceil(task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - 2 * period) / period))
     
     def set_epoch(self, epoch):
         self.current_epoch = epoch
