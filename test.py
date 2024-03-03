@@ -57,7 +57,7 @@ if __name__ == '__main__':
     # set a fixed seed for reproducibility 
     set_seed(seed=10)
     
-    result_dir = configs.ROOT_DIR + '/record' 
+    result_dir = configs.save_dir + '/record' 
     if not os.path.exists(result_dir):
        os.makedirs(result_dir)
 
