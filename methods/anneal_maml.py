@@ -38,7 +38,7 @@ class ANNEMAML(MetaTemplate):
         scores  = self.classifier.forward(out)
         return scores
 
-    def annealing_type(self, task_update_num_final, task_update_num_initial, annealing_rate, current_epoch, atype=None):
+    def annealing_func(self, task_update_num_final, task_update_num_initial, annealing_rate, current_epoch, atype=None):
       period = 150 // 3 # let the trapezoid has shorter shape
       if atype == 'con':
         return task_update_num_initial
@@ -84,7 +84,7 @@ class ANNEMAML(MetaTemplate):
         self.zero_grad()
 
         # Calculate task_update_num based on current epoch
-        self.task_update_num = self.annealing_type(self.task_update_num_final, self.task_update_num_initial, self.annealing_rate, self.current_epoch, atype=self.annealing_type)
+        self.task_update_num = self.annealing_func(self.task_update_num_final, self.task_update_num_initial, self.annealing_rate, self.current_epoch, atype=self.annealing_type)
         
         # self.task_update_num = int(max(self.task_update_num_final, self.task_update_num_initial -  self.annealing_rate * self.current_epoch))
 
