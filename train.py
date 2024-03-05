@@ -114,7 +114,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
     # Save final training times to a text file
     with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as time_file:
-        time_file.write(f'Epoch: {epoch}, Training Time: {elapsed_hours:.4f} seconds\n')
+        time_file.write(f'Epoch: {epoch}, Training Time: {elapsed_hours:.4f} hours\n')
 
     return model
 
