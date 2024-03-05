@@ -39,7 +39,8 @@ class ANNEMAML(MetaTemplate):
         return scores
 
     def annealing_func(self, task_update_num_final, task_update_num_initial, annealing_rate, current_epoch, atype=None):
-      period = 150 // 3 # let the trapezoid has shorter shape
+      epochs = 150
+      period = epochs // 3 # let the trapezoid has shorter shape
       if atype == 'con':
         return task_update_num_initial
       # linear step
