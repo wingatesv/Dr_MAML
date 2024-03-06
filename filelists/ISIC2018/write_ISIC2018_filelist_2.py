@@ -39,7 +39,7 @@ for dataset in dataset_list:
             file_list += classfile_list
             label_list += np.repeat(i, len(classfile_list)).tolist()
 
-    with open(join(savedir, f"{dataset}.json"), "w") as fo:
+    with open(join(savedir, f"{dataset}_2.json"), "w") as fo:
         json.dump({"label_names": folder_list, "image_names": file_list, "image_labels": label_list}, fo)
 
     print(f"{dataset} - OK")
