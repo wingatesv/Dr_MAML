@@ -44,7 +44,6 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
   
     max_acc = 0   
     total_training_time = 0
-    val_acc = []    
     scheduler = None
     # scheduler = lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=(stop_epoch-start_epoch), eta_min=0.0001)
 
@@ -58,27 +57,26 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         start_time = time.time() # record start time
         model.train()
         model.train_loop(epoch, base_loader,  optimizer) #model are called by reference, no need to return 
+        # annealing_rate = model.get_annealing_rate()
+
         model.eval()
 
         if not os.path.isdir(params.checkpoint_dir):
             os.makedirs(params.checkpoint_dir)
 
         acc = model.test_loop(val_loader)
-        val_acc.append(acc)
-
+   
          # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
           log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}\n')
+          # log_file.write(f'Epoch: {epoch}, Annealing rate: {annealing_rate:.4f}, Validation Accuracy: {acc:.4f}\n')
 
         if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
             print("best model! save...")
             max_acc = acc
             early_stopping_counter = 0
             outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-            if hasattr(model, 'task_lr'):
-                torch.save({'epoch':epoch, 'state':model.state_dict(), 'task_lr': model.task_lr}, outfile)
-            else:
-                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
 
         elif acc == -1: #for baseline and baseline++
           pass
@@ -98,10 +96,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            if hasattr(model, 'task_lr'):
-                torch.save({'epoch':epoch, 'state':model.state_dict(), 'task_lr': model.task_lr}, outfile)
-            else:
-                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
 
             
         elapsed_time = time.time() - start_time # calculate elapsed time
