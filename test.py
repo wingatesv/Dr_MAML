@@ -193,6 +193,25 @@ if __name__ == '__main__':
           else:
               loadfile  = configs.data_dir['Smear'] + split + '.json'
 
+        elif params.dataset == 'BreaKHis_40x_2':
+          if split == 'base':
+              loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+          else:
+              loadfile  = configs.data_dir['BreaKHis_40x'] + split + '_2.json'
+
+        elif params.dataset == 'ISIC_2':
+          if split == 'base':
+              loadfile = configs.data_dir['ISIC'] + 'base_2.json' 
+          else:
+              loadfile  = configs.data_dir['ISIC'] + split + '_2.json'
+
+        elif params.dataset == 'Smear_2':
+          if split == 'base':
+              loadfile = configs.data_dir['Smear'] + 'base_2.json' 
+          else:
+              loadfile  = configs.data_dir['Smear'] + split + '_2.json'
+
+
 
         else:
             raise ValueError(f"Unsupported dataset: {params.dataset}")
