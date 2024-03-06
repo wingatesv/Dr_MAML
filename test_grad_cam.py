@@ -24,7 +24,7 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
-from methods.imaml_idcg import IMAML_IDCG
+from methods.anneal_maml import ANNEMAML
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
 
@@ -40,7 +40,7 @@ import torchvision.transforms as transforms
 if __name__ == '__main__':
     mp.set_start_method('spawn')
     params = parse_args('grad_cam')
-    print(f'Applying {params.sn} stain normalisation......') if params.sn else print()
+    print(f'Applying {params.sn} stain normalization......') if params.sn else print()
 
 
     iter_num = 1
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method_1 == 'relationnet' else 'softmax'
         model_1           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method_1 in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
+    elif params.method_1 in ['maml' , 'maml_approx', 'anil', 'annemal']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -74,15 +74,23 @@ if __name__ == '__main__':
       backbone.ResNet.maml = True
 
       if params.method_1 in ['maml', 'maml_approx']:
-        assert params.model_1 not in ['ResNet18_IM_F', 'ResNet34_IM_F', 'ResNet50_IM_F'], 'maml do not support frozen feature extractor'
         model_1 = MAML(  model_dict[params.model_1], approx = (params.method_1 == 'maml_approx') , **few_shot_params )
      
       elif params.method_1 == 'anil':
         model_1 = ANIL(  model_dict[params.model_1], approx = False , **few_shot_params )
 
-      elif params.method_1 == 'imaml_idcg':
-        assert params.model_1 in ['ResNet18_IM_F', 'ResNet34_IM_F', 'ResNet50_IM_F', 'ResNet18_IM', 'ResNet34_IM', 'ResNet50_IM'], 'IMAML_IDCG only support ImageNet pre-trained feature extractor'
-        model_1 = IMAML_IDCG(  model_dict[params.model_1], approx = False , **few_shot_params )
+      elif params.method == 'annemaml':     
+        if params.anneal_param != 'none':
+            anneal_params = params.anneal_param.split('-')
+        else:
+            raise ValueError('Unknown Annealing Parameters')
+        model_1 = ANNEMAML(  model_dict[params.model], 
+                         annealing_type = str(anneal_params[0]), 
+                         task_update_num_initial = int(anneal_params[1]), 
+                         task_update_num_final = int(anneal_params[2]), 
+                         annealing_rate = float(anneal_params[3]), 
+                         approx = False , 
+                     **few_shot_params )
 
 
     else:
@@ -129,7 +137,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model_2           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method_2 in ['maml' , 'maml_approx', 'anil', 'imaml_idcg']:
+    elif params.method_2 in ['maml' , 'maml_approx', 'anil', 'annemal']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -143,9 +151,18 @@ if __name__ == '__main__':
       elif params.method_2 == 'anil':
         model_2 = ANIL(  model_dict[params.model_2], approx = False , **few_shot_params )
 
-      elif params.method_2 == 'imaml_idcg':
-        assert params.model_2 in ['ResNet18_IM_F', 'ResNet34_IM_F', 'ResNet50_IM_F', 'ResNet18_IM', 'ResNet34_IM', 'ResNet50_IM'], 'IMAML_IDCG only support ImageNet pre-trained feature extractor'
-        model_2 = IMAML_IDCG(  model_dict[params.model_2], approx = False , **few_shot_params )
+      elif params.method == 'annemaml':     
+        if params.anneal_param != 'none':
+            anneal_params = params.anneal_param.split('-')
+        else:
+            raise ValueError('Unknown Annealing Parameters')
+        model_2 = ANNEMAML(  model_dict[params.model], 
+                         annealing_type = str(anneal_params[0]), 
+                         task_update_num_initial = int(anneal_params[1]), 
+                         task_update_num_final = int(anneal_params[2]), 
+                         annealing_rate = float(anneal_params[3]), 
+                         approx = False , 
+                     **few_shot_params )
 
 
     else:
@@ -156,6 +173,8 @@ if __name__ == '__main__':
     checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model_2, params.method_2)
     if params.train_aug:
         checkpoint_dir += f'_{params.train_aug}'
+    if params.anneal_param != 'none':
+        checkpoint_dir += f'_{params.anneal_param}'
     if params.sn:
         checkpoint_dir += '_stainnet'
 
@@ -183,7 +202,7 @@ if __name__ == '__main__':
 
 
 
-    if params.method_1 in ['maml', 'maml_approx', 'anil', 'imaml_idcg'] and params.method_2 in ['maml', 'maml_approx', 'anil', 'imaml_idcg']: #maml do not support testing with feature
+    if params.method_1 in ['maml', 'maml_approx', 'anil', 'annemal'] and params.method_2 in ['maml', 'maml_approx', 'anil', 'annemal']: #maml do not support testing with feature
         if 'Conv' in params.model_1 or 'Conv' in params.model_2:
             image_size = 84 
         else:
@@ -223,8 +242,25 @@ if __name__ == '__main__':
               loadfile = configs.data_dir['Smear'] + 'base.json' 
           else:
               loadfile  = configs.data_dir['Smear'] + split + '.json'
+              
+        # different dataset split
+        elif params.dataset == 'BreaKHis_40x_2':
+          if split == 'base':
+              loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+          else:
+              loadfile  = configs.data_dir['BreaKHis_40x'] + split + '_2.json'
 
+        elif params.dataset == 'ISIC_2':
+          if split == 'base':
+              loadfile = configs.data_dir['ISIC'] + 'base_2.json' 
+          else:
+              loadfile  = configs.data_dir['ISIC'] + split + '_2.json'
 
+        elif params.dataset == 'Smear_2':
+          if split == 'base':
+              loadfile = configs.data_dir['Smear'] + 'base_2.json' 
+          else:
+              loadfile  = configs.data_dir['Smear'] + split + '_2.json'
         else:
             raise ValueError(f"Unsupported dataset: {params.dataset}")
 
@@ -232,8 +268,6 @@ if __name__ == '__main__':
         # get a batch of images
         images, _ = next(iter(novel_loader))
         images = images.view(1, 3, 224, 224)
-
-
 
         # create a list of image grids, one for each sample in the batch
         image_grids = []
@@ -252,7 +286,7 @@ if __name__ == '__main__':
         merged_grid = merged_grid.permute(1, 2, 0)
         np_images = merged_grid.numpy()
 
-        
+
         method_names =  [params.method_1, params.method_2]
         model_names = [params.model_1, params.model_2]
 
