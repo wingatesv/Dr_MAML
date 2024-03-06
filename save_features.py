@@ -13,9 +13,6 @@ from methods.baselinefinetune import BaselineFinetune
 from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
-from methods.maml import MAML
-from methods.anil import ANIL
-from methods.imaml_idcg import IMAML_IDCG
 
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file 
@@ -50,7 +47,7 @@ if __name__ == '__main__':
     
     print(f'Applying StainNet stain normalisation......') if params.sn else print()
 
-    assert params.method not in ['maml', 'maml_approx', 'anil', 'imaml_idcg'], 'maml variants do not support save_feature and run'
+    assert params.method not in ['maml', 'maml_approx', 'anil', 'annemal'], 'maml variants do not support save_feature and run'
 
     if 'Conv' in params.model:
       image_size = 84 
@@ -91,6 +88,25 @@ if __name__ == '__main__':
           loadfile = configs.data_dir['Smear'] + 'base.json' 
       else:
           loadfile  = configs.data_dir['Smear'] + split + '.json'
+
+    # Different dataset split
+    elif params.dataset == 'BreaKHis_40x_2':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+      else:
+          loadfile  = configs.data_dir['BreaKHis_40x'] + split + '_2.json'
+
+    elif params.dataset == 'ISIC_2':
+      if split == 'base':
+          loadfile = configs.data_dir['ISIC'] + 'base_2.json' 
+      else:
+          loadfile  = configs.data_dir['ISIC'] + split + '_2.json'
+
+    elif params.dataset == 'Smear_2':
+      if split == 'base':
+          loadfile = configs.data_dir['Smear'] + 'base_2.json' 
+      else:
+          loadfile  = configs.data_dir['Smear'] + split + '_2.json'
 
 
     else:
