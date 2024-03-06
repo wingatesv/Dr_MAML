@@ -141,14 +141,23 @@ if __name__=='__main__':
     elif params.dataset == 'BreaKHis_40x':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base.json' 
         val_file   = configs.data_dir['BreaKHis_40x'] + 'val.json' 
-
     elif params.dataset == 'ISIC':
         base_file = configs.data_dir['ISIC'] + 'base.json' 
         val_file   = configs.data_dir['ISIC'] + 'val.json' 
-
     elif params.dataset == 'Smear':
         base_file = configs.data_dir['Smear'] + 'base.json' 
-        val_file   = configs.data_dir['Smear'] + 'val.json' 
+        val_file   = configs.data_dir['Smear'] + 'val.json'
+        
+    # different dataset split 
+    elif params.dataset == 'BreaKHis_40x_2':
+        base_file = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+        val_file   = configs.data_dir['BreaKHis_40x'] + 'val_2.json' 
+    elif params.dataset == 'ISIC_2':
+        base_file = configs.data_dir['ISIC'] + 'base_2.json' 
+        val_file   = configs.data_dir['ISIC'] + 'val_2.json' 
+    elif params.dataset == 'Smear_2':
+        base_file = configs.data_dir['Smear'] + 'base_2.json' 
+        val_file   = configs.data_dir['Smear'] + 'val_2.json'
 
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
@@ -292,12 +301,3 @@ if __name__=='__main__':
 
 
     model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
-    
-
-
-
-
-
-
-
-
