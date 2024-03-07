@@ -113,6 +113,7 @@ if __name__ == '__main__':
                          task_update_num_initial = int(anneal_params[1]), 
                          task_update_num_final = int(anneal_params[2]), 
                          annealing_rate = float(anneal_params[3]), 
+                         test_mode = True,
                          approx = False , 
                      **few_shot_params )
 
