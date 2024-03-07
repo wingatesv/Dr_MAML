@@ -11,7 +11,7 @@ from tqdm import tqdm
 import math
 
 class ANNEMAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, annealing_rate = None, approx = False):
+    def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, annealing_rate = None, test_mode = False, approx = False):
         super(ANNEMAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
@@ -32,6 +32,7 @@ class ANNEMAML(MetaTemplate):
         self.task_update_num_final = task_update_num_final
         self.current_epoch = 0
         self.last_task_update_num = self.task_update_num_initial
+        self.test_mode = test_mode
       
     def forward(self,x):
         out  = self.feature.forward(x)
@@ -85,8 +86,11 @@ class ANNEMAML(MetaTemplate):
         self.zero_grad()
 
         # Calculate task_update_num based on current epoch
-        self.task_update_num = self.annealing_func(self.task_update_num_final, self.task_update_num_initial, self.annealing_rate, self.current_epoch, atype=self.annealing_type)
-        self.annealing_rate_list.append(self.annealing_rate)
+        if self.test_mode:
+            self.task_update_num = self.task_update_num_initial
+        else:
+            self.task_update_num = self.annealing_func(self.task_update_num_final, self.task_update_num_initial, self.annealing_rate, self.current_epoch, atype=self.annealing_type)
+            self.annealing_rate_list.append(self.annealing_rate)
       
         # self.task_update_num = int(max(self.task_update_num_final, self.task_update_num_initial -  self.annealing_rate * self.current_epoch))
 
