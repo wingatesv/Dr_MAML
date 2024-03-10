@@ -51,13 +51,20 @@ class LRANNEMAML(MetaTemplate):
       # exp 
       elif atype == 'exp':
         return max(final_inner_lr, initial_inner_lr * np.exp(-annealing_rate * current_epoch))
-      # cosine step
+      # cosine 
       elif atype == 'cos':
-        return max(final_inner_lr, initial_inner_lr * np.cos(annealing_rate * current_epoch))
-      # sigmoid step
+        # Cosine annealing phase
+        t = current_epoch / epochs
+        cosine_lr = 0.5 * (1 + np.cos(5 * np.pi * t))  #  five cosine cycles
+        updated_lr = final_inner_lr + (initial_inner_lr - final_inner_lr) * cosine_lr
+        return max(final_inner_lr, updated_lr)
+      # sigmoid
       elif atype == 'sig':
-        return max(final_inner_lr, initial_inner_lr / (1 + np.exp(annealing_rate * (current_epoch - epochs / 2))))
-      # trapezoid step
+        t = current_epoch / epochs
+        sigmoid_lr = 1 / (1 + np.exp(-10 * (t - 0.5)))  # Sigmoid annealing
+        updated_lr = initial_inner_lr + (final_inner_lr - initial_inner_lr) * sigmoid_lr
+        return max(final_inner_lr, updated_lr)
+      # trapezoid
       elif atype == 'tra':
         if current_epoch < period:
           # Increase linearly
