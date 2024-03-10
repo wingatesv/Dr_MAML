@@ -47,7 +47,7 @@ class LRANNEMAML(MetaTemplate):
         return initial_inner_lr
       # linear 
       elif atype == 'lin':
-        return max(final_inner_lr, initial_inner_lr - annealing_rate * current_epoch)
+        return max(final_inner_lr, initial_inner_lr - annealing_rate * 0.001 * current_epoch)
       # exp 
       elif atype == 'exp':
         return max(final_inner_lr, initial_inner_lr * np.exp(-annealing_rate * current_epoch))
