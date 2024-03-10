@@ -7,4 +7,5 @@ from . import relationnet
 from . import maml
 from . import anil
 from . import anneal_maml
+from . import lr_anneal_maml
 
