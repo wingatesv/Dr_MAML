@@ -117,12 +117,12 @@ if __name__ == '__main__':
                          approx = False , 
                      **few_shot_params )
 
-       elif params.method == 'lrannemaml':     
+      elif params.method == 'lrannemaml':     
             if params.anneal_param != 'none':
                 anneal_params = params.anneal_param.split('-')
             else:
                 raise ValueError('Unknown Annealing Parameters')
-            model = ANNEMAML(  model_dict[params.model], 
+            model = LRANNEMAML(  model_dict[params.model], 
                              annealing_type = str(anneal_params[0]), 
                              initial_inner_lr = float(anneal_params[1]), 
                              final_inner_lr = float(anneal_params[2]), 
