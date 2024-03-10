@@ -124,8 +124,8 @@ if __name__ == '__main__':
                 raise ValueError('Unknown Annealing Parameters')
             model = ANNEMAML(  model_dict[params.model], 
                              annealing_type = str(anneal_params[0]), 
-                             initial_inner_lr = int(anneal_params[1]), 
-                             final_inner_lr = int(anneal_params[2]), 
+                             initial_inner_lr = float(anneal_params[1]), 
+                             final_inner_lr = float(anneal_params[2]), 
                              annealing_rate = float(anneal_params[3]), 
                              test_mode = True,
                              approx = False , 
