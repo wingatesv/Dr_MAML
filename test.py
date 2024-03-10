@@ -25,7 +25,7 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
-
+from methods.lr_anneal_maml import LRANNEMAML
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file, set_seed
 
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     
 
     params = parse_args('test')
-    print(f'Applying StainNet stain normalisation......') if params.sn else print()
+    print(f'Applying StainNet stain normalization......') if params.sn else print()
 
     acc_all = []
     iter_num = 600
@@ -90,7 +90,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'lrannemaml']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -116,6 +116,20 @@ if __name__ == '__main__':
                          test_mode = True,
                          approx = False , 
                      **few_shot_params )
+
+       elif params.method == 'lrannemaml':     
+            if params.anneal_param != 'none':
+                anneal_params = params.anneal_param.split('-')
+            else:
+                raise ValueError('Unknown Annealing Parameters')
+            model = ANNEMAML(  model_dict[params.model], 
+                             annealing_type = str(anneal_params[0]), 
+                             initial_inner_lr = int(anneal_params[1]), 
+                             final_inner_lr = int(anneal_params[2]), 
+                             annealing_rate = float(anneal_params[3]), 
+                             test_mode = True,
+                             approx = False , 
+                         **few_shot_params )
 
     else:
        raise ValueError('Unknown method')
@@ -150,7 +164,7 @@ if __name__ == '__main__':
         split_str = split + "_" +str(params.save_iter)
     else:
         split_str = split
-    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'lrannemaml']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
