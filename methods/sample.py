@@ -685,3 +685,152 @@ def set_forward(self,x, is_feature = False):
 
     return x_a_i_augmented, y_a_i_augmented, x_b_i
 
+
+# weight decay
+def set_forward(self, x, is_feature=False):
+    assert is_feature == False, 'MAML does not support fixed features'
+
+    x = x.cuda()
+    x_var = Variable(x)
+    x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:])  # support data
+    x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:])  # query data
+    y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()  # label for support data
+
+    fast_parameters = list(self.parameters())
+    for weight in self.parameters():
+        weight.fast = None
+    self.zero_grad()
+
+    for task_step in range(self.task_update_num):
+        scores = self.forward(x_a_i)
+        set_loss = self.loss_fn(scores, y_a_i)
+
+        # Calculate gradients including L2 regularization
+        grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
+        if self.approx:
+            grad = [g.detach() for g in grad]
+
+        fast_parameters = []
+        for k, weight in enumerate(self.parameters()):
+            if weight.fast is None:
+                # Add L2 regularization term
+                weight.fast = weight - self.train_lr * grad[k] - self.train_lr * self.weight_decay * weight
+            else:
+                weight.fast = weight.fast - self.train_lr * grad[k] - self.train_lr * self.weight_decay * weight
+            fast_parameters.append(weight.fast)
+
+    scores = self.forward(x_b_i)
+    return scores
+
+
+    L1 regularization
+
+def set_forward(self, x, is_feature=False):
+    assert is_feature == False, 'MAML does not support fixed features'
+
+    x = x.cuda()
+    x_var = Variable(x)
+    x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:])  # support data
+    x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:])  # query data
+    y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()  # label for support data
+
+    fast_parameters = list(self.parameters())
+    for weight in self.parameters():
+        weight.fast = None
+    self.zero_grad()
+
+    for task_step in range(self.task_update_num):
+        scores = self.forward(x_a_i)
+        set_loss = self.loss_fn(scores, y_a_i)
+
+        # Calculate gradients including L1 regularization
+        grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
+        if self.approx:
+            grad = [g.detach() for g in grad]
+
+        fast_parameters = []
+        for k, weight in enumerate(self.parameters()):
+            if weight.fast is None:
+                # Add L1 regularization term
+                weight.fast = weight - self.train_lr * grad[k] - self.train_lr * self.l1_lambda * torch.sign(weight)
+            else:
+                weight.fast = weight.fast - self.train_lr * grad[k] - self.train_lr * self.l1_lambda * torch.sign(weight)
+            fast_parameters.append(weight.fast)
+
+    scores = self.forward(x_b_i)
+    return scores
+
+Elastic Net regularization:
+
+def set_forward(self, x, is_feature=False):
+    assert is_feature == False, 'MAML does not support fixed features'
+
+    x = x.cuda()
+    x_var = Variable(x)
+    x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:])  # support data
+    x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:])  # query data
+    y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()  # label for support data
+
+    fast_parameters = list(self.parameters())
+    for weight in self.parameters():
+        weight.fast = None
+    self.zero_grad()
+
+    for task_step in range(self.task_update_num):
+        scores = self.forward(x_a_i)
+        set_loss = self.loss_fn(scores, y_a_i)
+
+        # Calculate gradients including Elastic Net regularization
+        grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
+        if self.approx:
+            grad = [g.detach() for g in grad]
+
+        fast_parameters = []
+        for k, weight in enumerate(self.parameters()):
+            if weight.fast is None:
+                # Add Elastic Net regularization term
+                weight.fast = weight - self.train_lr * grad[k] - self.train_lr * self.l1_lambda * torch.sign(weight) - self.train_lr * self.l2_lambda * weight
+            else:
+                weight.fast = weight.fast - self.train_lr * grad[k] - self.train_lr * self.l1_lambda * torch.sign(weight) - self.train_lr * self.l2_lambda * weight
+            fast_parameters.append(weight.fast)
+
+    scores = self.forward(x_b_i)
+    return scores
+
+Stochastic Average Gradient:
+
+def set_forward(self, x, is_feature=False):
+    assert is_feature == False, 'MAML does not support fixed features'
+
+    x = x.cuda()
+    x_var = Variable(x)
+    x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:])  # support data
+    x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:])  # query data
+    y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()  # label for support data
+
+    fast_parameters = list(self.parameters())
+    for weight in self.parameters():
+        weight.fast = None
+    self.zero_grad()
+
+    for task_step in range(self.task_update_num):
+        scores = self.forward(x_a_i)
+        set_loss = self.loss_fn(scores, y_a_i)
+
+        # Calculate gradients using SAG
+        grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
+        if self.approx:
+            grad = [g.detach() for g in grad]
+
+        fast_parameters = []
+        for k, weight in enumerate(self.parameters()):
+            if weight.fast is None:
+                # Update using SAG
+                weight.fast = weight - self.train_lr * grad[k] - self.train_lr * (weight - weight.fast)
+            else:
+                weight.fast = weight.fast - self.train_lr * grad[k] - self.train_lr * (weight - weight.fast)
+            fast_parameters.append(weight.fast)
+
+    scores = self.forward(x_b_i)
+    return scores
+
