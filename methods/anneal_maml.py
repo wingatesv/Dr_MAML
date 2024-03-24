@@ -9,6 +9,10 @@ import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 import math
+import random
+
+# make sure the seed value is the same with the training script
+random.seed(10)
 
 class ANNEMAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, annealing_rate = None, test_mode = False, approx = False):
@@ -47,8 +51,11 @@ class ANNEMAML(MetaTemplate):
         return task_update_num_initial
       # linear step
       elif atype == 'lin':
-        return int(math.ceil(max(task_update_num_final, task_update_num_initial - annealing_rate * current_epoch)))
-      # exp sten
+        return int(math.ceil(max(task_update_num_final, task_update_num_initial - annealing_rate * current_epoch))) 
+      # inverse linear step    
+      elif atype == 'lin_up':
+        return int(math.ceil(min(task_update_num_initial, task_update_num_final + annealing_rate * current_epoch)))
+      # exp step
       elif atype == 'exp':
         return int(math.ceil(max(task_update_num_final, task_update_num_initial * np.exp(-annealing_rate * current_epoch))))
       # cosine step
@@ -68,7 +75,19 @@ class ANNEMAML(MetaTemplate):
         else:
             # Decrease linearly
             return int(math.ceil(task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - 2 * period) / period))
-    
+      # triangle step     
+      elif atype == 'tri':
+         if current_epoch < period:
+            # Increase linearly
+            return  int(math.ceil(task_update_num_final + (task_update_num_initial - task_update_num_final) * current_epoch / period))
+         else:
+            # Decrease linearly
+            return int(math.ceil(max(task_update_num_initial, task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - period) / period)))
+      # random step
+      elif atype == 'rand':
+          # Generate a random number of steps within the range of initial and final
+          return random.randint(task_update_num_final, task_update_num_initial)
+
     def set_epoch(self, epoch):
         self.current_epoch = epoch
 
