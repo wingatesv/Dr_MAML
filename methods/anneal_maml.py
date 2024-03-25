@@ -87,7 +87,7 @@ class ANNEMAML(MetaTemplate):
          period = epochs // 2 
          if current_epoch < period:
             # stay at maximum
-            return int(task_update_num_final)
+            return int(task_update_num_initial)
          else:
             # Decrease linearly
             return int(math.ceil(max(task_update_num_final, task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - period) / period)))
