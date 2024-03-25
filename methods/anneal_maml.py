@@ -74,7 +74,7 @@ class ANNEMAML(MetaTemplate):
             # Decrease linearly
             return int(math.ceil(task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - 2 * period) / period))
       # half trapezium step     
-      elif atype == 'half_tra':
+      elif atype == 'up_tra':
          period = epochs // 2 
          if current_epoch < period:
             # Increase linearly
@@ -82,7 +82,15 @@ class ANNEMAML(MetaTemplate):
          else:
             # Stay at maximum
             return int(task_update_num_initial)
-
+     # half trapezium step     
+      elif atype == 'down_tra':
+         period = epochs // 2 
+         if current_epoch < period:
+            # stay at maximum
+            return int(task_update_num_final)
+         else:
+            # Decrease linearly
+            return int(math.ceil(max(task_update_num_final, task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - period) / period)))
      # triangle step     
       elif atype == 'tri':
          period = epochs // 2 
