@@ -73,7 +73,17 @@ class ANNEMAML(MetaTemplate):
         else:
             # Decrease linearly
             return int(math.ceil(task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - 2 * period) / period))
-      # triangle step     
+      # half trapezium step     
+      elif atype == 'half_tra':
+         period = epochs // 2 
+         if current_epoch < period:
+            # Increase linearly
+            return  int(math.ceil(task_update_num_final + (task_update_num_initial - task_update_num_final) * current_epoch / period))
+         else:
+            # Stay at maximum
+            return int(task_update_num_initial)
+
+     # triangle step     
       elif atype == 'tri':
          period = epochs // 2 
          if current_epoch < period:
@@ -81,7 +91,7 @@ class ANNEMAML(MetaTemplate):
             return  int(math.ceil(task_update_num_final + (task_update_num_initial - task_update_num_final) * current_epoch / period))
          else:
             # Decrease linearly
-            return int(math.ceil(max(task_update_num_initial, task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - period) / period)))
+            return int(math.ceil(max(task_update_num_final, task_update_num_initial - (task_update_num_initial - task_update_num_final) * (current_epoch - period) / period)))
       # random step
       elif atype == 'rand':
           # make sure the seed value is the same with the training script
