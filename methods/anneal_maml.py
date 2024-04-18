@@ -80,7 +80,7 @@ class ANNEMAML(MetaTemplate):
         return scores
 
     def annealing_func(self, task_update_num_final, task_update_num_initial, annealing_rate, current_epoch, atype=None):
-      epochs = 150
+      epochs = 200
       if atype == 'con':
         return task_update_num_initial
       # linear step
