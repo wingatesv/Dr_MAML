@@ -191,7 +191,7 @@ class ANNEMAML(MetaTemplate):
           return trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_adaptation_step = task_update_num_initial, min_adaptation_step = task_update_num_final,  include_max_phase=True, half=True)
 
       elif atype == 'tra_3':
-          return trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = annealing_rate)
+          return new_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = annealing_rate)
 
     def set_epoch(self, epoch):
         self.current_epoch = epoch
