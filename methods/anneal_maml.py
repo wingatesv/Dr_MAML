@@ -11,6 +11,43 @@ from tqdm import tqdm
 import math
 import random
 
+def trapezoidal_step_scheduler(total_epochs, current_epoch, max_adaptation_step, min_adaptation_step,  include_max_phase=True, half=False):
+    # Guardrails to ensure correct types and values for the parameters
+    assert isinstance(total_epochs, int), "total_epochs must be an integer"
+    assert isinstance(current_epoch, int), "current_epoch must be an integer"
+    assert isinstance(max_adaptation_step, int), "max_adaptation_step must be an integer"
+    assert isinstance(min_adaptation_step, int), "min_adaptation_step must be an integer"
+    assert isinstance(include_max_phase, bool), "include_max_phase must be a boolean"
+    assert isinstance(half, bool), "half must be a boolean"
+    
+    assert min_adaptation_step > 0, "min_adaptation_step must be greater than 0"
+    assert max_adaptation_step > min_adaptation_step, "max_adaptation_step must be greater than min_adaptation_step"
+
+    # Check total_epochs based on the value of half and include_max_phase
+    if not half:
+      assert total_epochs >= 12 if include_max_phase else  total_epochs % max_adaptation_step == 0, "total_epochs must be at least 12 if include_max_phase, else total_epochs must be divisible by max_adaptation_step"
+
+    # Determine the trapezoidal_region based on the value of half and include_max_phase
+    trapezoidal_region = 2 if half or not include_max_phase else 3
+
+    # Calculate the period and frequencies per step
+    period = total_epochs // trapezoidal_region
+    freq_per_step = math.floor(period / (max_adaptation_step - 1)) if include_max_phase else math.floor(period / (max_adaptation_step))
+    freq_max_step = total_epochs - (trapezoidal_region - 1) * (freq_per_step * (max_adaptation_step - 1))
+
+    # Determine the current step based on the current epoch and whether the max adaptation step phase is included
+    if include_max_phase:
+        if current_epoch < freq_per_step * (max_adaptation_step - 1):
+            return min_adaptation_step + current_epoch // freq_per_step
+        elif current_epoch < freq_per_step * (max_adaptation_step - 1) + freq_max_step:
+            return max_adaptation_step
+        else:
+            return (max_adaptation_step - 1) - (current_epoch - freq_per_step * (max_adaptation_step - 1) - freq_max_step) // freq_per_step
+    else:
+        if current_epoch < freq_per_step * (max_adaptation_step):
+            return min_adaptation_step + current_epoch // freq_per_step
+        else:
+            return max_adaptation_step - (current_epoch - freq_per_step * (max_adaptation_step)) // freq_per_step
 
 class ANNEMAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, annealing_rate = None, test_mode = False, approx = False):
@@ -51,7 +88,7 @@ class ANNEMAML(MetaTemplate):
         return int(math.ceil(max(task_update_num_final, task_update_num_initial - annealing_rate * current_epoch))) 
       # inverse linear step    
       elif atype == 'lin_up':
-        return int(math.ceil(min(task_update_num_initial, task_update_num_final + annealing_rate * current_epoch)))
+        return int(math.floor(min(task_update_num_initial, task_update_num_final + annealing_rate * current_epoch)))
       # exp step
       elif atype == 'exp':
         return int(math.ceil(max(task_update_num_final, task_update_num_initial * np.exp(-annealing_rate * current_epoch))))
@@ -106,6 +143,15 @@ class ANNEMAML(MetaTemplate):
           random.seed(10)
           # Generate a random number of steps within the range of initial and final
           return random.randint(task_update_num_final, task_update_num_initial)
+
+      elif atype == 'tra_2':
+          return trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_adaptation_step = task_update_num_initial, min_adaptation_step = task_update_num_final,  include_max_phase=True, half=False)
+
+      elif atype == 'tri_2':
+          return trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_adaptation_step = task_update_num_initial, min_adaptation_step = task_update_num_final,  include_max_phase=False, half=False)
+
+      elif atype == 'up_tra_2':
+          return trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_adaptation_step = task_update_num_initial, min_adaptation_step = task_update_num_final,  include_max_phase=True, half=True)
 
     def set_epoch(self, epoch):
         self.current_epoch = epoch
