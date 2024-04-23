@@ -7,28 +7,51 @@ from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
+from methods.trap_step_scheduler import half_trapezoidal_step_scheduler, new_trapezoidal_step_scheduler, trapezoidal_step_scheduler
 from tqdm import tqdm
 
 
-class ANIL(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, approx = False):
-        super(ANIL, self).__init__( model_func,  n_way, n_support, change_way = False)
+class TRA_ANIL(MetaTemplate):
+    def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, width = None, test_mode = False, approx = False:
+        super(TRA_ANIL, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         
         self.n_task     = 4 #meta-batch, meta update every meta batch
-        self.task_update_num = 5
+        self.task_update_num = 0
         self.train_lr = 0.01 #this is the inner loop learning rate
         self.approx = approx #first order approx.    
+        self.inner_loop_steps_list  = []  
 
-        self.task_update_num_initial = 20
-        self.task_update_num_final = 1
+        # annealing parameters
+        print(f'Trapezoidal params: {annealing_type}-{task_update_num_initial}-{task_update_num_final}-{annealing_rate}\n')
+        self.annealing_type = annealing_type
+        self.width = width  
+        self.task_update_num_initial = task_update_num_initial
+        self.task_update_num_final = task_update_num_final
         self.current_epoch = 0
-        self.annealing_rate = 0.05  # adjust this value based on your needs
         self.last_task_update_num = self.task_update_num_initial
 
+        self.test_mode = test_mode
+
+def annealing_func(self, task_update_num_final, task_update_num_initial, width, current_epoch, atype=None):
+      epochs = 200
+      if atype == 'con':
+      
+      elif atype == 'tra_3':
+          return new_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width)
+
+      elif atype == 'up_tra_3':
+          return half_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width, half_right=True)
+    
+      elif atype == 'down_tra_3':
+          return half_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width, half_right=False)
+
+    def set_epoch(self, epoch):
+        self.current_epoch = epoch
+        
     def forward(self,x):
         out  = self.feature.forward(x)
         scores  = self.classifier.forward(out)
@@ -48,8 +71,13 @@ class ANIL(MetaTemplate):
             weight.fast = None
         self.zero_grad()
 
-        # Calculate task_update_num based on current epoch
-        self.task_update_num = int(max(self.task_update_num_final, self.task_update_num_initial - self.annealing_rate * self.current_epoch))
+        # do not anneal the inner steps in meta testing
+        if self.test_mode:
+            self.task_update_num = self.task_update_num_initial
+        else:
+            # Calculate task_update_num based on current epoch
+            self.task_update_num = self.annealing_func(self.task_update_num_final, self.task_update_num_initial, self.width, self.current_epoch, atype=self.annealing_type)
+
 
         # Print task_update_num if it has changed
         if self.task_update_num != int(self.last_task_update_num):
@@ -97,6 +125,8 @@ class ANIL(MetaTemplate):
         task_count = 0
         loss_all = []
 
+        self.set_epoch(epoch)
+
         optimizer.zero_grad()
 
         #train
@@ -143,7 +173,7 @@ class ANIL(MetaTemplate):
         # for i, (x,_) in enumerate(test_loader):
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way  ==  x.size(0), "ANIL do not support way change"
+            assert self.n_way  ==  x.size(0), "TRA_ANIL do not support way change"
             correct_this, count_this = self.correct(x)
             acc_all.append(correct_this/ count_this *100 )
 
