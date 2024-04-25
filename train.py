@@ -145,6 +145,15 @@ if __name__=='__main__':
         val_file   = configs.data_dir['Smear'] + 'val.json'
         
     # different dataset split 
+    elif params.dataset == 'BreaKHis_4x_2':
+        base_file = configs.data_dir['BreaKHis_4x'] + 'base_2.json' 
+        val_file   = configs.data_dir['BreaKHis_4x'] + 'val_2.json' 
+    elif params.dataset == 'BreaKHis_10x_2':
+        base_file = configs.data_dir['BreaKHis_10x'] + 'base_2.json' 
+        val_file   = configs.data_dir['BreaKHis_10x'] + 'val_2.json' 
+    elif params.dataset == 'BreaKHis_20x_2':
+        base_file = configs.data_dir['BreaKHis_20x'] + 'base_2.json' 
+        val_file   = configs.data_dir['BreaKHis_20x'] + 'val_2.json' 
     elif params.dataset == 'BreaKHis_40x_2':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
         val_file   = configs.data_dir['BreaKHis_40x'] + 'val_2.json' 
