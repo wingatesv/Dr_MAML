@@ -90,6 +90,21 @@ if __name__ == '__main__':
           loadfile  = configs.data_dir['Smear'] + split + '.json'
 
     # Different dataset split
+    elif params.dataset == 'BreaKHis_4x_2':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_4x'] + 'base_2.json' 
+      else:
+          loadfile  = configs.data_dir['BreaKHis_4x'] + split + '_2.json'
+    elif params.dataset == 'BreaKHis_10x_2':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_10x'] + 'base_2.json' 
+      else:
+          loadfile  = configs.data_dir['BreaKHis_10x'] + split + '_2.json'
+    elif params.dataset == 'BreaKHis_20x_2':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_20x'] + 'base_2.json' 
+      else:
+          loadfile  = configs.data_dir['BreaKHis_20x'] + split + '_2.json'
     elif params.dataset == 'BreaKHis_40x_2':
       if split == 'base':
           loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
