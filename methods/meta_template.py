@@ -45,12 +45,13 @@ class MetaTemplate(nn.Module):
 
     def correct(self, x):       
         scores = self.set_forward(x)
+        loss = self.set_forward_loss(x)
         y_query = np.repeat(range( self.n_way ), self.n_query )
 
         topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
         topk_ind = topk_labels.cpu().numpy()
         top1_correct = np.sum(topk_ind[:,0] == y_query)
-        return float(top1_correct), len(y_query)
+        return float(top1_correct), len(y_query), loss
 
     def train_loop(self, epoch, train_loader, optimizer):
         print_freq = 10
