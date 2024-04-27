@@ -52,6 +52,10 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     patience = int(patience_ratio * (stop_epoch - start_epoch))
     warmup_epochs = int(warmup_epochs_ratio * (stop_epoch - start_epoch))
     early_stopping_counter = 0
+    
+    timestamp_start = time.strftime("%Y%m%d-%H%M%S", time.localtime()) 
+    with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
+        log_file.write(f'Time: {timestamp_start}, Training Start\n')
 
 
     for epoch in range(start_epoch,stop_epoch):
@@ -65,12 +69,12 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         if not os.path.isdir(params.checkpoint_dir):
             os.makedirs(params.checkpoint_dir)
 
-        acc = model.test_loop(val_loader)
+        acc, avg_loss = model.test_loop(val_loader)
    
-         # Save validation accuracy and training time to a text file
+        # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
-          log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}\n')
-          # log_file.write(f'Epoch: {epoch}, Annealing rate: {annealing_rate:.4f}, Validation Accuracy: {acc:.4f}\n')
+          log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}, Validation Loss: {avg_loss.4f}\n')
+
 
         if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
             print("best model! save...")
@@ -107,11 +111,12 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     elapsed_hours = total_training_time / 3600.0 # convert to hours
     print(f"Total Training Time: {elapsed_hours:.2f} h") # print elapsed time for current epoch in hours
 
-
+    timestamp_end = time.strftime("%Y%m%d-%H%M%S", time.localtime()) 
     # Save final training times to a text file
-    with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as time_file:
-        time_file.write(f'Epoch: {epoch}, Training Time: {elapsed_hours:.4f} hours\n')
-
+    with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
+        log_file.write(f'Epoch: {epoch}, Training Time: {elapsed_hours:.4f} hours\n')
+        log_file.write(f'Time: {timestamp_end}, Training End\n')
+        
     return model
 
 if __name__=='__main__':
