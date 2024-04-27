@@ -74,6 +74,7 @@ class MetaTemplate(nn.Module):
     def test_loop(self, test_loader):
         correct =0
         count = 0
+        avg_loss=0
         acc_all = []
         
         iter_num = len(test_loader) 
@@ -83,15 +84,16 @@ class MetaTemplate(nn.Module):
             self.n_query = x.size(1) - self.n_support
             if self.change_way:
                 self.n_way  = x.size(0)
-            correct_this, count_this = self.correct(x)
+            correct_this, count_this, loss = self.correct(x)
             acc_all.append(correct_this/ count_this*100  )
+            avg_loss = avg_loss+loss.item()
 
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
-        print('%d Test Acc = %4.2f%% ± %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        print('%d Test Acc = %4.2f%% ± %4.2f%%, Test Loss = %4.4f' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num), , float(avg_loss/iter_num)))
 
-        return acc_mean
+        return acc_mean, float(avg_loss/iter_num)
 
     def set_forward_adaptation(self, x, is_feature = True): #further adaptation, default is fixing feature and train a new softmax clasifier
         assert is_feature == True, 'Feature is fixed in further adaptation'
