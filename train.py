@@ -73,7 +73,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
    
         # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
-          log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}, Validation Loss: {avg_loss.4f}\n')
+          log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}, Validation Loss: {avg_loss:.4f}\n')
 
 
         if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
