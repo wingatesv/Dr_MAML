@@ -91,7 +91,7 @@ class MetaTemplate(nn.Module):
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
-        print('%d Test Acc = %4.2f%% ± %4.2f%%, Test Loss = %4.4f' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num), , float(avg_loss/iter_num)))
+        print('%d Test Acc = %4.2f%% ± %4.2f%%, Test Loss = %4.4f' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num), float(avg_loss/iter_num)))
 
         return acc_mean, float(avg_loss/iter_num)
 
