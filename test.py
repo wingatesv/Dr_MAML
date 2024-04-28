@@ -252,7 +252,7 @@ if __name__ == '__main__':
         if params.adaptation:
             model.task_update_num = 100 #We perform adaptation on MAML simply by updating more times.
         model.eval()
-        acc_mean, acc_std = model.test_loop( novel_loader, return_std = True)
+        acc_mean, acc_std, avg_loss = model.test_loop( novel_loader, return_std = True)
 
     else:
         novel_file = os.path.join( checkpoint_dir.replace("checkpoints","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
