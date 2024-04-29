@@ -45,7 +45,9 @@ class MetaTemplate(nn.Module):
 
     def correct(self, x):       
         scores = self.set_forward(x)
-        loss = self.set_forward_loss(x)
+        y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
+        loss = self.loss_fn(scores, y_b_i)
+
         y_query = np.repeat(range( self.n_way ), self.n_query )
 
         topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
