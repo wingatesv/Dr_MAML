@@ -33,7 +33,7 @@ def parse_args(script):
 
     if script == 'train':
         parser.add_argument('--num_classes' , default=6, type=int, help='total number of classes in softmax, only used in baseline') #make it larger than the maximum label value in base class
-        parser.add_argument('--save_freq'   , default=50, type=int, help='Save frequency')
+        parser.add_argument('--save_freq'   , default=20, type=int, help='Save frequency')
         parser.add_argument('--optimizer'   , default='Adam', type=str, help='Optimizer for training, Adam or Ranger')
         parser.add_argument('--loss_func'   , default='cross_entropy', type=str, help='Type of loss')
         parser.add_argument('--start_epoch' , default=0, type=int,help ='Starting epoch')
