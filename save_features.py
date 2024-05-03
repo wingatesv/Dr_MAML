@@ -123,6 +123,15 @@ if __name__ == '__main__':
       else:
           loadfile  = configs.data_dir['Smear'] + split + '_2.json'
 
+    elif params.dataset == 'cross_IDC':
+      if split == 'base':
+          loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+      elif split == 'val':
+           loadfile  = configs.data_dir['BreaKHis_40x'] + 'val_2.json'
+      else:
+           loadfile  = configs.data_dir['BCHI'] + 'novel.json'
+         
+
 
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
