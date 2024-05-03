@@ -38,9 +38,7 @@ class TRA_ANIL(MetaTemplate):
 
 def annealing_func(self, task_update_num_final, task_update_num_initial, width, current_epoch, atype=None):
       epochs = 200
-      if atype == 'con':
-      
-      elif atype == 'tra_3':
+      if atype == 'tra_3':
           return new_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width)
 
       elif atype == 'up_tra_3':
