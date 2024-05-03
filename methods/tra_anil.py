@@ -26,7 +26,7 @@ class TRA_ANIL(MetaTemplate):
         self.inner_loop_steps_list  = []  
 
         # annealing parameters
-        print(f'Trapezoidal params: {annealing_type}-{task_update_num_initial}-{task_update_num_final}-{annealing_rate}\n')
+        print(f'Trapezoidal params: {annealing_type}-{task_update_num_initial}-{task_update_num_final}-{width}\n')
         self.annealing_type = annealing_type
         self.width = width  
         self.task_update_num_initial = task_update_num_initial
@@ -36,16 +36,16 @@ class TRA_ANIL(MetaTemplate):
 
         self.test_mode = test_mode
 
-def annealing_func(self, task_update_num_final, task_update_num_initial, width, current_epoch, atype=None):
-      epochs = 200
-      if atype == 'tra_3':
-          return new_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width)
-
-      elif atype == 'up_tra_3':
-          return half_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width, half_right=True)
+    def annealing_func(self, task_update_num_final, task_update_num_initial, width, current_epoch, atype=None):
+          epochs = 200
+          if atype == 'tra_3':
+              return new_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width)
     
-      elif atype == 'down_tra_3':
-          return half_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width, half_right=False)
+          elif atype == 'up_tra_3':
+              return half_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width, half_right=True)
+        
+          elif atype == 'down_tra_3':
+              return half_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = task_update_num_initial, min_step = task_update_num_final, max_step_width = width, half_right=False)
 
     def set_epoch(self, epoch):
         self.current_epoch = epoch
