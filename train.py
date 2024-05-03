@@ -26,6 +26,7 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
+from methods.tra_anil import TRA_ANIL
 from methods.lr_anneal_maml import LRANNEMAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
@@ -208,7 +209,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'lrannemaml']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_anil']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -238,7 +239,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'lrannemaml']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_anil']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -260,6 +261,20 @@ if __name__=='__main__':
                              task_update_num_initial = int(anneal_params[1]), 
                              task_update_num_final = int(anneal_params[2]), 
                              annealing_rate = float(anneal_params[3]),
+                             test_mode = False,
+                             approx = False, 
+                             **train_few_shot_params )
+
+          elif params.method == 'tra_anil':
+            if params.anneal_param != 'none':
+                anneal_params = params.anneal_param.split('-')
+            else:
+                raise ValueError('Unknown Annealing Parameters')
+            model = TRA_ANIL(  model_dict[params.model], 
+                             annealing_type = str(anneal_params[0]), 
+                             task_update_num_initial = int(anneal_params[1]), 
+                             task_update_num_final = int(anneal_params[2]), 
+                             width = float(anneal_params[3]),
                              test_mode = False,
                              approx = False, 
                              **train_few_shot_params )
