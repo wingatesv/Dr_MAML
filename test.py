@@ -25,6 +25,7 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
+from methods.tra_maml import TRA_MAML
 from methods.lr_anneal_maml import LRANNEMAML
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file, set_seed
@@ -90,7 +91,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'lrannemaml']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_maml']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -113,6 +114,20 @@ if __name__ == '__main__':
                          task_update_num_initial = int(anneal_params[1]), 
                          task_update_num_final = int(anneal_params[2]), 
                          annealing_rate = float(anneal_params[3]), 
+                         test_mode = True,
+                         approx = False , 
+                     **few_shot_params )
+
+      elif params.method == 'tra_maml':     
+        if params.anneal_param != 'none':
+            anneal_params = params.anneal_param.split('-')
+        else:
+            raise ValueError('Unknown Annealing Parameters')
+        model = TRA_ANIL(  model_dict[params.model], 
+                         annealing_type = str(anneal_params[0]), 
+                         task_update_num_initial = int(anneal_params[1]), 
+                         task_update_num_final = int(anneal_params[2]), 
+                         width = float(anneal_params[3]), 
                          test_mode = True,
                          approx = False , 
                      **few_shot_params )
@@ -168,7 +183,7 @@ if __name__ == '__main__':
         split_str = split + "_" +str(params.save_iter)
     else:
         split_str = split
-    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'lrannemaml']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_maml']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
