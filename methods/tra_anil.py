@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 
 class TRA_ANIL(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, width = None, test_mode = False, approx = False:
+    def __init__(self, model_func,  n_way, n_support, annealing_type = None, task_update_num_initial = None, task_update_num_final = None, width = None, test_mode = False, approx = False):
         super(TRA_ANIL, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
