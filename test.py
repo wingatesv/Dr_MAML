@@ -25,7 +25,7 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
-from methods.tra_maml import TRA_MAML
+from methods.tra_anil import TRA_ANIL
 from methods.lr_anneal_maml import LRANNEMAML
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file, set_seed
