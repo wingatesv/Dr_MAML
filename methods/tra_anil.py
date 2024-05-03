@@ -162,24 +162,29 @@ class TRA_ANIL(MetaTemplate):
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
                       
+
+
+
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
         count = 0
+        avg_loss=0
         acc_all = []
         
         iter_num = len(test_loader) 
-        # for i, (x,_) in enumerate(test_loader):
+
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way  ==  x.size(0), "TRA_ANIL do not support way change"
-            correct_this, count_this = self.correct(x)
+            correct_this, count_this, loss = self.correct(x)
             acc_all.append(correct_this/ count_this *100 )
+            avg_loss = avg_loss+loss.item()
 
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
-        print('%d Test Acc = %4.2f%% ± %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        print('%d Test Acc = %4.2f%% ± %4.2f%%, Test Loss = %4.4f' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num), float(avg_loss/iter_num)))
         if return_std:
-            return acc_mean, acc_std
+            return acc_mean, acc_std, float(avg_loss/iter_num)
         else:
-            return acc_mean
+            return acc_mean, float(avg_loss/iter_num)
