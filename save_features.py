@@ -47,7 +47,7 @@ if __name__ == '__main__':
     
     print(f'Applying StainNet stain normalisation......') if params.sn else print()
 
-    assert params.method not in ['maml', 'maml_approx', 'anil', 'annemal'], 'maml variants do not support save_feature and run'
+    assert params.method not in ['maml', 'maml_approx', 'anil', 'annemaml', 'tra_anil'], 'maml variants do not support save_feature and run'
 
     if 'Conv' in params.model:
       image_size = 84 
