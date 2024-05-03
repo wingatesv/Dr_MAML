@@ -91,7 +91,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_maml']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_anil']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -118,7 +118,7 @@ if __name__ == '__main__':
                          approx = False , 
                      **few_shot_params )
 
-      elif params.method == 'tra_maml':     
+      elif params.method == 'tra_anil':     
         if params.anneal_param != 'none':
             anneal_params = params.anneal_param.split('-')
         else:
@@ -183,7 +183,7 @@ if __name__ == '__main__':
         split_str = split + "_" +str(params.save_iter)
     else:
         split_str = split
-    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_maml']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'lrannemaml', 'tra_anil']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
