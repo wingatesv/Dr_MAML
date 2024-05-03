@@ -136,7 +136,11 @@ if __name__ == '__main__':
 
     model = model.cuda()
 
-    checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    if params.dataset == 'cross_IDC':
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, 'BreaKHis_40x_2', params.model, params.method)
+    else:
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+        
     if params.train_aug:
         checkpoint_dir += f'_{params.train_aug}'
     if params.anneal_param != 'none':
@@ -241,6 +245,13 @@ if __name__ == '__main__':
           else:
               loadfile  = configs.data_dir['Smear'] + split + '_2.json'
 
+        elif params.dataset == 'cross_IDC':
+          if split == 'base':
+              loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
+          elif split == 'val':
+              loadfile  = configs.data_dir['BreaKHis_40x'] + 'val_2.json'
+          else:
+              loadfile  = configs.data_dir['BCHI'] + 'novel.json'
 
 
         else:
