@@ -159,7 +159,7 @@ if __name__=='__main__':
     elif params.dataset == 'BreaKHis_20x_2':
         base_file = configs.data_dir['BreaKHis_20x'] + 'base_2.json' 
         val_file   = configs.data_dir['BreaKHis_20x'] + 'val_2.json' 
-    elif params.dataset == 'BreaKHis_40x_2':
+    elif params.dataset == 'BreaKHis_40x_2' or params.dataset == 'cross_IDC':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
         val_file   = configs.data_dir['BreaKHis_40x'] + 'val_2.json' 
     elif params.dataset == 'ISIC_2':
