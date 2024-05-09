@@ -45,8 +45,13 @@ class MetaTemplate(nn.Module):
 
     def correct(self, x):       
         scores = self.set_forward(x)
-        y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
-        loss = self.loss_fn(scores, y_b_i)
+        y = torch.from_numpy(np.repeat(range(self.n_way), self.n_query))
+        
+        if hasattr(self, 'loss_type') and self.loss_type == 'mse':
+            y = utils.one_hot(y, self.n_way)
+            
+        y = Variable(y.cuda())
+        loss = self.loss_fn(scores, y)
 
         y_query = np.repeat(range( self.n_way ), self.n_query )
 
