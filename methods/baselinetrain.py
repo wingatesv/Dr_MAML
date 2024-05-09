@@ -50,9 +50,9 @@ class BaselineTrain(nn.Module):
                      
     def test_loop(self, val_loader):
         if self.DBval:
-            return self.analysis_loop(val_loader)
+            return self.analysis_loop(val_loader), -1
         else:
-            return -1   #no validation, just save model during iteration
+            return -1, -1   #no validation, just save model during iteration
 
     def analysis_loop(self, val_loader, record = None):
         class_file  = {}
