@@ -289,6 +289,8 @@ if __name__ == '__main__':
         timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime()) 
         aug_str = f'-{params.train_aug}' if params.train_aug else '-none'
         aug_str += f'-{params.anneal_param}' if params.anneal_param != 'none' else '-none'
+        if hasattr(model, 'experimental'):
+            aug_str += f'-{model.experimental}'
         aug_str += '-adapted' if params.adaptation else ''
         if params.method in ['baseline', 'baseline++'] :
             exp_setting = '%s-%s-%s-%s%s %sshot %sway_test' %(params.dataset, split_str, params.model, params.method, aug_str, params.n_shot, params.test_n_way )
