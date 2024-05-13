@@ -91,7 +91,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmmal', 'tra_anil']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
