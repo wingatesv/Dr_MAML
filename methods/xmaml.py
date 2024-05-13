@@ -10,9 +10,9 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 import math
 
-class LRANNEMAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, annealing_type = None, initial_inner_lr = None, final_inner_lr = None, annealing_rate = None, test_mode = False, approx = False):
-        super(LRANNEMAML, self).__init__( model_func,  n_way, n_support, change_way = False)
+class XMAML(MetaTemplate):
+    def __init__(self, model_func,  n_way, n_support, approx = False, experimental = None):
+        super(XMAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -20,18 +20,10 @@ class LRANNEMAML(MetaTemplate):
         
         self.n_task     = 4 #meta-batch, meta update every meta batch
         self.task_update_num = 5
-        self.inner_lr = 0.00 #this is the inner loop learning rate
+        self.inner_lr = 0.01 #this is the inner loop learning rate
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
 
-        # annealing parameters
-        print(f'Annealing params: lr-{annealing_type}-{initial_inner_lr}-{final_inner_lr}-{annealing_rate}\n')
-        self.annealing_type = annealing_type
-        self.annealing_rate = annealing_rate  
-        self.initial_inner_lr = initial_inner_lr
-        self.final_inner_lr = final_inner_lr
-        self.current_epoch = 0
-        self.last_inner_lr = self.initial_inner_lr
 
         self.test_mode = test_mode
       
@@ -40,47 +32,12 @@ class LRANNEMAML(MetaTemplate):
         scores  = self.classifier.forward(out)
         return scores
 
-    def annealing_func(self, final_inner_lr, initial_inner_lr, annealing_rate, current_epoch, atype=None):
-      epochs = 150
-      period = epochs // 3 # let the trapezoid has shorter shape
-      if atype == 'con':
-        return initial_inner_lr
-      # linear 
-      elif atype == 'lin':
-        return max(final_inner_lr, initial_inner_lr - annealing_rate * 0.001 * current_epoch)
-      # exp 
-      elif atype == 'exp':
-        return max(final_inner_lr, initial_inner_lr * np.exp(-annealing_rate * current_epoch))
-      # cosine 
-      elif atype == 'cos':
-        # Cosine annealing phase
-        t = current_epoch / epochs
-        cosine_lr = 0.5 * (1 + np.cos(5 * np.pi * t))  #  five cosine cycles
-        updated_lr = final_inner_lr + (initial_inner_lr - final_inner_lr) * cosine_lr
-        return max(final_inner_lr, updated_lr)
-      # sigmoid
-      elif atype == 'sig':
-        t = current_epoch / epochs
-        sigmoid_lr = 1 / (1 + np.exp(-10 * (t - 0.5)))  # Sigmoid annealing
-        updated_lr = initial_inner_lr + (final_inner_lr - initial_inner_lr) * sigmoid_lr
-        return max(final_inner_lr, updated_lr)
-      # trapezoid
-      elif atype == 'tra':
-        if current_epoch < period:
-          # Increase linearly
-          return  final_inner_lr + (initial_inner_lr - final_inner_lr) * current_epoch / period
-        elif current_epoch < 2 * period:
-            # Stay at maximum
-            return initial_inner_lr
-        else:
-            # Decrease linearly
-            return initial_inner_lr - (initial_inner_lr - final_inner_lr) * (current_epoch - 2 * period) / period
-    
+ 
     def set_epoch(self, epoch):
         self.current_epoch = epoch
 
     def set_forward(self,x, is_feature = False):
-        assert is_feature == False, 'LRANNEMAML do not support fixed feature' 
+        assert is_feature == False, 'XMAML do not support fixed feature' 
         
         x = x.cuda()
         x_var = Variable(x)
@@ -93,12 +50,12 @@ class LRANNEMAML(MetaTemplate):
             weight.fast = None
         self.zero_grad()
 
-        # do not anneal the inner steps in meta testing
-        if self.test_mode:
-            self.inner_lr = self.initial_inner_lr
-        else:
-            # Calculate task_update_num based on current epoch
-            self.inner_lr = self.annealing_func(self.final_inner_lr, self.initial_inner_lr, self.annealing_rate, self.current_epoch, atype=self.annealing_type)
+        # # do not anneal the inner steps in meta testing
+        # if self.test_mode:
+        #     self.inner_lr = self.initial_inner_lr
+        # else:
+        #     # Calculate task_update_num based on current epoch
+        #     self.inner_lr = self.annealing_func(self.final_inner_lr, self.initial_inner_lr, self.annealing_rate, self.current_epoch, atype=self.annealing_type)
 
 
         for task_step in range(self.task_update_num): 
@@ -122,7 +79,7 @@ class LRANNEMAML(MetaTemplate):
         return scores
 
     def set_forward_adaptation(self,x, is_feature = False): #overwrite parrent function
-        raise ValueError('ANNEMAML performs further adapation simply by increasing task_upate_num')
+        raise ValueError('XMAML performs further adapation simply by increasing task_upate_num')
 
 
     def set_forward_loss(self, x):
@@ -147,7 +104,7 @@ class LRANNEMAML(MetaTemplate):
         for i, (x,_) in enumerate(train_loader):
 
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way  ==  x.size(0), "MAML do not support way change"
+            assert self.n_way  ==  x.size(0), "XMAML do not support way change"
             
 
             loss = self.set_forward_loss(x)
@@ -172,21 +129,23 @@ class LRANNEMAML(MetaTemplate):
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
         count = 0
+        avg_loss=0
         acc_all = []
         
         iter_num = len(test_loader) 
         # for i, (x,_) in enumerate(test_loader):
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way  ==  x.size(0), "LRANNEMAML do not support way change"
-            correct_this, count_this = self.correct(x)
+            assert self.n_way  ==  x.size(0), "MAML do not support way change"
+            correct_this, count_this, loss = self.correct(x)
             acc_all.append(correct_this/ count_this *100 )
+            avg_loss = avg_loss+loss.item()
 
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
-        print('%d Test Acc = %4.2f%% ± %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        print('%d Test Acc = %4.2f%% ± %4.2f%%, Test Loss = %4.4f' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num), float(avg_loss/iter_num)))
         if return_std:
-            return acc_mean, acc_std
+            return acc_mean, acc_std, float(avg_loss/iter_num)
         else:
-            return acc_mean
+            return acc_mean, float(avg_loss/iter_num)
