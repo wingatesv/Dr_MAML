@@ -56,8 +56,8 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     
     timestamp_start = time.strftime("%Y%m%d-%H%M%S", time.localtime()) 
     with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
-        if hasattr(model, 'experiment'):
-            log_file.write(f'MAML Experiment: {model.experiment}\n')
+        if hasattr(model, 'experimental'):
+            log_file.write(f'MAML Experiment: {model.experimental}\n')
         log_file.write(f'Time: {timestamp_start}, Training Start\n')
 
 
