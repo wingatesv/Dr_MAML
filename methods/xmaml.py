@@ -11,7 +11,7 @@ from tqdm import tqdm
 import math
 
 class XMAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, approx = False, experimental = None):
+    def __init__(self, model_func,  n_way, n_support, test_mode = False, approx = False, experimental = None):
         super(XMAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
@@ -24,7 +24,7 @@ class XMAML(MetaTemplate):
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
 
-
+        self.experimental = experimental
         self.test_mode = test_mode
       
     def forward(self,x):
