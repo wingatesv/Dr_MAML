@@ -834,3 +834,47 @@ def set_forward(self, x, is_feature=False):
     scores = self.forward(x_b_i)
     return scores
 
+
+# QLoss with linear annealing weights
+
+def train_loop(self, epoch, train_loader, optimizer, max_weight, min_weight, num_epochs):
+    print_freq = 10
+    avg_loss = 0
+    task_count = 0
+    loss_all = []
+
+    self.set_epoch(epoch)
+
+    optimizer.zero_grad()
+
+    # Calculate weight based on linear annealing schedule
+    weight = max_weight - (max_weight - min_weight) * (epoch / num_epochs)
+    weight = max(weight, min_weight)  # Ensure weight is not lower than min_weight
+
+    # Train
+    for i, (x, _) in enumerate(train_loader):
+
+        self.n_query = x.size(1) - self.n_support
+        assert self.n_way == x.size(0), "XMAML does not support way change"
+
+        loss = self.set_forward_loss(x)
+        avg_loss += loss.item()
+        loss_all.append(loss)  # Append unweighted loss
+
+        task_count += 1
+
+        if task_count == self.n_task:  # MAML update several tasks at one time
+            # Apply weight to losses and calculate weighted sum
+            weighted_losses = [loss * weight for loss in loss_all]
+            loss_q = torch.stack(weighted_losses).sum(0)
+            loss_value = loss_q.item()
+            loss_q.backward()
+            optimizer.step()
+
+            task_count = 0
+            loss_all = []
+            optimizer.zero_grad()
+            if i % print_freq == 0:
+                print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss / float(i + 1)))
+
+    return avg_loss / len(train_loader)
