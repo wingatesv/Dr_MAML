@@ -1,3 +1,14 @@
+# This code is modified from https://github.com/dragen1860/MAML-Pytorch and https://github.com/katerakelly/pytorch-maml 
+import backbone
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+import numpy as np
+import torch.nn.functional as F
+from methods.meta_template import MetaTemplate
+from tqdm import tqdm
+from methods.enviroment import InnerLoopEn
+
 class MAML(MetaTemplate):
     def __init__(self, model_func, n_way, n_support, approx=False):
         super(MAML, self).__init__(model_func, n_way, n_support, change_way=False)
