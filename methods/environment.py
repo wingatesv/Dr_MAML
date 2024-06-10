@@ -1,8 +1,9 @@
 import gym
 from stable_baselines3 import PPO
+import numpy as np
 
 class InnerLoopEnv(gym.Env):
-    def __init__(self, maml_instance, max_steps=10):
+    def __init__(self, maml_instance, max_steps=5):
         super(InnerLoopEnv, self).__init__()
         self.maml = maml_instance
         self.max_steps = max_steps
