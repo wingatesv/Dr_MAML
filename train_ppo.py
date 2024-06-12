@@ -23,7 +23,7 @@ from methods.baselinefinetune import BaselineFinetune
 from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
-from methods.maml import MAML
+# from methods.maml import MAML
 from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
@@ -31,7 +31,7 @@ from methods.xmaml import XMAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
-
+from methods.ppo_maml import MAML
 from methods.environment import MAMLEnv
 
 
