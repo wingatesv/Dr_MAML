@@ -7,10 +7,10 @@ import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
-
+from methods.ppo_torch import Agent
 
 class MAML(MetaTemplate):
-    def __init__(self, model_func, n_way, n_support, approx=False):
+    def __init__(self, model_func, n_way, n_support, env, approx=False):
         super(MAML, self).__init__(model_func, n_way, n_support, change_way=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -23,9 +23,17 @@ class MAML(MetaTemplate):
 
         self.inner_loop_steps_list = []
 
+        self.env = env
         # Placeholder for train and val losses
+        self.agent = Agent(n_actions=self.env.action_space.n, batch_size=5, 
+                    alpha=0.0003, n_epochs=4, 
+                    input_dims=self.env.observation_space.shape)
+        
         self.current_train_loss = -1
         self.current_val_loss = -1
+        self.n_step = 0
+        self.reward = 0
+        self.observation = np.array([self.current_train_loss])
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -74,7 +82,9 @@ class MAML(MetaTemplate):
         task_count = 0
         loss_all = []
 
-    
+        self.action, self.prob, self.val = self.agent.choose_action(self.observation)
+        self.task_update_num = action
+        
 
         optimizer.zero_grad()
         for i, (x, _) in enumerate(train_loader):
@@ -100,6 +110,7 @@ class MAML(MetaTemplate):
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / float(i + 1):.6f}')
 
         self.current_train_loss = avg_loss/len(train_loader)
+        self.observation = np.array([self.current_train_loss])
 
     def test_loop(self, test_loader, return_std=False):
         correct = 0
@@ -121,6 +132,11 @@ class MAML(MetaTemplate):
         print(f'{iter_num} Test Acc = {acc_mean:.2f}% ± {1.96 * acc_std / np.sqrt(iter_num):.2f}%, Test Loss = {avg_loss / iter_num:.4f}')
 
         self.current_val_loss = avg_loss/len(test_loader)
+        self.reward = - self.current_val_loss
+
+        if not test_mode:
+            agent.remember(self.observation, self.action, self.prob, self.val, self.reward)
+            agent.learn()
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
