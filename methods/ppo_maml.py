@@ -7,7 +7,7 @@ import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
-from methods.enviroment import InnerLoopEn
+
 
 class MAML(MetaTemplate):
     def __init__(self, model_func, n_way, n_support, approx=False):
@@ -17,15 +17,15 @@ class MAML(MetaTemplate):
         self.classifier.bias.data.fill_(0)
         
         self.n_task = 4
-        self.task_update_num = 5
+        self.task_update_num = 3
         self.train_lr = 0.01
         self.approx = approx
 
         self.inner_loop_steps_list = []
 
         # Placeholder for train and val losses
-        self.current_train_loss = None
-        self.current_val_loss = None
+        self.current_train_loss = -1
+        self.current_val_loss = -1
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -68,20 +68,19 @@ class MAML(MetaTemplate):
         loss = self.loss_fn(scores, y_b_i)
         return loss
 
-    def train_loop(self, epoch, train_loader, optimizer, ppo_model):
+    def train_loop(self, epoch, train_loader, optimizer):
         print_freq = 10
         avg_loss = 0
         task_count = 0
         loss_all = []
+
+    
 
         optimizer.zero_grad()
         for i, (x, _) in enumerate(train_loader):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
 
-            obs = np.array([self.current_train_loss, self.current_val_loss])
-            action, _ = ppo_model.predict(obs)
-            self.task_update_num = action + 1
 
             loss = self.set_forward_loss(x)
             avg_loss += loss.item()
@@ -99,6 +98,8 @@ class MAML(MetaTemplate):
             optimizer.zero_grad()
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / float(i + 1):.6f}')
+
+        self.current_train_loss = avg_loss/len(train_loader)
 
     def test_loop(self, test_loader, return_std=False):
         correct = 0
@@ -118,6 +119,9 @@ class MAML(MetaTemplate):
         acc_mean = np.mean(acc_all)
         acc_std = np.std(acc_all)
         print(f'{iter_num} Test Acc = {acc_mean:.2f}% ± {1.96 * acc_std / np.sqrt(iter_num):.2f}%, Test Loss = {avg_loss / iter_num:.4f}')
+
+        self.current_val_loss = avg_loss/len(test_loader)
+        
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
         else:
