@@ -11,8 +11,8 @@ class MAMLEnv(gym.Env):
         # Define action space (task_update_num ranging from 1 to 5)
         self.action_space = spaces.Discrete(5)
 
-        # Define observation space (train_loss and val_loss)
-        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2,), dtype=np.float32)
+        # Define observation space (train_loss)
+        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(1,), dtype=np.float32)
 
         # Initial state
         self.state = np.zeros(2)
@@ -24,30 +24,6 @@ class MAMLEnv(gym.Env):
         print('self.state':, self.state)
         return self.state
 
-    def step(self, action, train_loss, val_loss):
-        # Perform the action by setting the task_update_num in MAML
-        self.maml.task_update_num = action + 1
-
-        # Update state with new train and validation losses
-        self.state = np.array([train_loss, val_loss])
-
-        # Define the reward as negative validation loss to minimize it
-        reward = -val_loss
-
-        # Increment epoch count
-        self.current_epoch += 1
-
-        # Check if the episode is done (for simplicity, let's say an episode is 10 epochs)
-        done = self.current_epoch >= 10
-
-        return self.state, reward, done, {}
-
-    def render(self, mode='human'):
-        # Print current state
-        print(f'Epoch: {self.current_epoch}, Train Loss: {self.state[0]}, Val Loss: {self.state[1]}')
-
-    def close(self):
-        pass
 
 
 
