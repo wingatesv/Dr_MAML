@@ -63,12 +63,18 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             log_file.write(f'MAML Experiment: {model.experimental}\n')
         log_file.write(f'Time: {timestamp_start}, Training Start\n')
 
-
+    current_train_loss = -1
+    current_val_loss = -1
+    reward = -1
+    
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
         model.train()
-        model.train_loop(epoch, base_loader,  optimizer, agent) #model are called by reference, no need to return 
-        # annealing_rate = model.get_annealing_rate()
+        current_train_loss = model.train_loop(epoch, base_loader,  optimizer) #model are called by reference, no need to return 
+        
+        observation = np.array(current_train_loss)
+        action, prob, val = agent.choose_action(observation)
+        model.task_update_num = action
 
         model.eval()
 
@@ -76,6 +82,14 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             os.makedirs(params.checkpoint_dir)
 
         acc, avg_loss = model.test_loop(val_loader)
+
+        current_val_loss = avg_loss
+        reward = -current_val_loss
+        agent.remember(observation, act, prob, val, reward)
+
+        if n_steps % N === 0:
+            agent.learn()
+            learn_iters += 1
    
         # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
