@@ -31,11 +31,11 @@ from methods.xmaml import XMAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
-from methods.ppo_torch import Agent
+
 from methods.environment import MAMLEnv
 
 
-def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, agent, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
+def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
     learning_rate = 0.0001
     if optimization == 'Adam':
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
@@ -63,19 +63,13 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             log_file.write(f'MAML Experiment: {model.experimental}\n')
         log_file.write(f'Time: {timestamp_start}, Training Start\n')
 
-    current_train_loss = -1
-    current_val_loss = -1
-    reward = -1
+
     
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
         model.train()
-        current_train_loss = model.train_loop(epoch, base_loader,  optimizer) #model are called by reference, no need to return 
-        
-        observation = np.array(current_train_loss)
-        action, prob, val = agent.choose_action(observation)
-        model.task_update_num = action
-
+        model.train_loop(epoch, base_loader,  optimizer) #model are called by reference, no need to return 
+   
         model.eval()
 
         if not os.path.isdir(params.checkpoint_dir):
@@ -83,13 +77,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
         acc, avg_loss = model.test_loop(val_loader)
 
-        current_val_loss = avg_loss
-        reward = -current_val_loss
-        agent.remember(observation, act, prob, val, reward)
 
-        if n_steps % N === 0:
-            agent.learn()
-            learn_iters += 1
    
         # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
@@ -265,7 +253,7 @@ if __name__=='__main__':
           backbone.ResNet.maml = True
 
           if params.method in ['maml', 'maml_approx']:
-            model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
+            model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') env = env = MAMLenv(), **train_few_shot_params )
        
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
@@ -310,10 +298,7 @@ if __name__=='__main__':
           raise ValueError('Unknown method')
 
 
-
- 
-
-    
+  
     model = model.cuda()
 
     params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
@@ -340,10 +325,7 @@ if __name__=='__main__':
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
 
-    env = MAMLenv()
-
-    agent = Agent(n_actions=env.action_space.n, batch_size=5, 
-                    alpha=0.0003, n_epochs=4, 
-                    input_dims=env.observation_space.shape)
     
-    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params, agent)
+
+    
+    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
