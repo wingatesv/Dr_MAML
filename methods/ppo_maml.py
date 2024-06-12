@@ -10,7 +10,7 @@ from tqdm import tqdm
 from methods.ppo_torch import Agent
 
 class MAML(MetaTemplate):
-    def __init__(self, model_func, n_way, n_support, env, approx=False):
+    def __init__(self, model_func, n_way, n_support, env, approx=False, test_mode=False):
         super(MAML, self).__init__(model_func, n_way, n_support, change_way=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -20,7 +20,7 @@ class MAML(MetaTemplate):
         self.task_update_num = 3
         self.train_lr = 0.01
         self.approx = approx
-
+        self.test_mode = test_mode
         self.inner_loop_steps_list = []
 
         self.env = env
@@ -83,7 +83,10 @@ class MAML(MetaTemplate):
         loss_all = []
 
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-        self.task_update_num = action
+        print('action:', self.action)
+        print('prob:', self.prob)
+        print('val:', self.val)
+        self.task_update_num = self.action
         
 
         optimizer.zero_grad()
@@ -111,6 +114,7 @@ class MAML(MetaTemplate):
 
         self.current_train_loss = avg_loss/len(train_loader)
         self.observation = np.array([self.current_train_loss])
+        print('observation: ', self.observation)
 
     def test_loop(self, test_loader, return_std=False):
         correct = 0
@@ -132,11 +136,12 @@ class MAML(MetaTemplate):
         print(f'{iter_num} Test Acc = {acc_mean:.2f}% ± {1.96 * acc_std / np.sqrt(iter_num):.2f}%, Test Loss = {avg_loss / iter_num:.4f}')
 
         self.current_val_loss = avg_loss/len(test_loader)
-        self.reward = - self.current_val_loss
-
-        if not test_mode:
-            agent.remember(self.observation, self.action, self.prob, self.val, self.reward)
-            agent.learn()
+        self.reward = np.array([- self.current_val_loss])
+        print('reward: ', self.reward)
+        done = False
+        if not self.test_mode:
+            self.agent.remember(self.observation, self.action, self.prob, self.val, self.reward, done)
+            self.agent.learn()
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
