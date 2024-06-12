@@ -3,25 +3,25 @@ from gym import spaces
 import numpy as np
 
 class MAMLEnv(gym.Env):
-    def __init__(self, maml_model):
+    def __init__(self):
         super(MAMLEnv, self).__init__()
-        self.maml = maml_model
-        self.current_epoch = 0
 
         # Define action space (task_update_num ranging from 1 to 5)
         self.action_space = spaces.Discrete(5)
+        print('action space: ', self.action_space)
 
         # Define observation space (train_loss)
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(1,), dtype=np.float32)
-
+        print('observation_space: ', self.observation_space)
         # Initial state
         self.state = np.zeros(2)
-        
+        print('state: ', self.state)
+
     def reset(self):
         # Reset the MAML model and state for a new episode
         self.current_epoch = 0
         self.state = np.zeros(2)
-        print('self.state':, self.state)
+        print('self.state', self.state)
         return self.state
 
 
