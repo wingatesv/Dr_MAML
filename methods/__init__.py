@@ -9,4 +9,5 @@ from . import anil
 from . import anneal_maml
 from . import xmaml
 from . import tra_anil
+from . import ppo_torch
 
