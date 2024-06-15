@@ -120,6 +120,7 @@ class MAML(MetaTemplate):
         correct = 0
         count = 0
         avg_loss = 0
+        done = True
         acc_all = []
 
         iter_num = len(test_loader)
@@ -138,7 +139,7 @@ class MAML(MetaTemplate):
         self.current_val_loss = avg_loss/len(test_loader)
         self.reward = np.array([- self.current_val_loss])
         print('reward: ', self.reward)
-        done = False
+        
         if not self.test_mode:
             self.agent.remember(self.observation, self.action, self.prob, self.val, self.reward, done)
             self.agent.learn()
