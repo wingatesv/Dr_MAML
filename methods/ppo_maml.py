@@ -86,7 +86,7 @@ class MAML(MetaTemplate):
         print('action:', self.action)
         print('prob:', self.prob)
         print('val:', self.val)
-        self.task_update_num = self.action
+        self.task_update_num = self.action + 1
         
 
         optimizer.zero_grad()
