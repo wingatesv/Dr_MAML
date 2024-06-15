@@ -17,15 +17,6 @@ class MAMLEnv(gym.Env):
         self.state = np.zeros(2)
         print('state: ', self.state)
 
-    def reset(self):
-        # Reset the MAML model and state for a new episode
-        self.current_epoch = 0
-        self.state = np.zeros(2)
-        print('self.state', self.state)
-        return self.state
-
-
-
 
 # Instantiate environment
 # inner_loop_env = InnerLoopEnv(maml_instance)
