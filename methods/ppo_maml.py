@@ -17,7 +17,7 @@ class PPO_MAML(MetaTemplate):
         self.classifier.bias.data.fill_(0)
         
         self.n_task = 4
-        self.task_update_num = 0
+        self.task_update_num = 5 # for meta-testing
         self.train_lr = 0.01
         self.approx = approx
         self.test_mode = test_mode
