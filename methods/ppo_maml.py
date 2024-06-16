@@ -17,7 +17,7 @@ class MAML(MetaTemplate):
         self.classifier.bias.data.fill_(0)
         
         self.n_task = 4
-        self.task_update_num = 3
+        self.task_update_num = 0
         self.train_lr = 0.01
         self.approx = approx
         self.test_mode = test_mode
@@ -83,7 +83,7 @@ class MAML(MetaTemplate):
         loss_all = []
 
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-        print('action:', self.action)
+        print('action:', self.action + 1)
         print('prob:', self.prob)
         print('val:', self.val)
         self.task_update_num = self.action + 1
