@@ -31,7 +31,7 @@ from methods.xmaml import XMAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
-from methods.ppo_maml import MAML
+from methods.ppo_maml import PPO_MAML
 from methods.environment import MAMLEnv
 
 
@@ -254,7 +254,7 @@ if __name__=='__main__':
             model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
 
           elif params.method == 'ppo_maml':
-            model = MAML(  model_dict[params.model], approx = False, env  = MAMLEnv(), **train_few_shot_params )
+            model = PPO_MAML(  model_dict[params.model], approx = False, env  = MAMLEnv(), **train_few_shot_params )
        
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
