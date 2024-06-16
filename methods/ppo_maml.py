@@ -136,11 +136,11 @@ class PPO_MAML(MetaTemplate):
         acc_std = np.std(acc_all)
         print(f'{iter_num} Test Acc = {acc_mean:.2f}% ± {1.96 * acc_std / np.sqrt(iter_num):.2f}%, Test Loss = {avg_loss / iter_num:.4f}')
 
-        self.current_val_loss = avg_loss/len(test_loader)
-        self.reward = np.array([- self.current_val_loss])
-        print('reward: ', self.reward)
         
         if not self.test_mode:
+            self.current_val_loss = avg_loss/len(test_loader)
+            self.reward = np.array([- self.current_val_loss])
+            print('reward: ', self.reward)
             self.agent.remember(self.observation, self.action, self.prob, self.val, self.reward, done)
             self.agent.learn()
         
