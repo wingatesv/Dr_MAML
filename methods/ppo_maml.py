@@ -9,9 +9,9 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from methods.ppo_torch import Agent
 
-class MAML(MetaTemplate):
+class PPO_MAML(MetaTemplate):
     def __init__(self, model_func, n_way, n_support, env, approx=False, test_mode=False):
-        super(MAML, self).__init__(model_func, n_way, n_support, change_way=False)
+        super(PPO_MAML, self).__init__(model_func, n_way, n_support, change_way=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
