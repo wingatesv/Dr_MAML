@@ -26,12 +26,13 @@ class PPO_MAML(MetaTemplate):
         self.env = env
         # Placeholder for train and val losses
         self.agent = Agent(n_actions=self.env.action_space.n, batch_size=5, 
-                    alpha=0.0003, n_epochs=4, 
+                    alpha=0.01, n_epochs=5, 
                     input_dims=self.env.observation_space.shape)
         
         self.current_train_loss = -1
         self.current_val_loss = -1
-        self.n_step = 0
+        self.n_steps = 0
+        self.learn_iters = 0
         self.reward = 0
         self.observation = np.array([self.current_train_loss])
 
@@ -86,8 +87,8 @@ class PPO_MAML(MetaTemplate):
         print('action:', self.action + 1)
         print('prob:', self.prob)
         print('val:', self.val)
-        self.task_update_num = self.action + 1
-        
+        self.task_update_num = self.action + 1 # agent.step
+        self.n_steps += 1
 
         optimizer.zero_grad()
         for i, (x, _) in enumerate(train_loader):
@@ -121,6 +122,7 @@ class PPO_MAML(MetaTemplate):
         count = 0
         avg_loss = 0
         done = True
+        N = 5
         acc_all = []
 
         iter_num = len(test_loader)
@@ -142,7 +144,11 @@ class PPO_MAML(MetaTemplate):
             self.reward = np.array([- self.current_val_loss])
             print('reward: ', self.reward)
             self.agent.remember(self.observation, self.action, self.prob, self.val, self.reward, done)
-            self.agent.learn()
+
+            if self.n_steps % N == 0:
+                self.agent.learn()
+                self.learn_iters +=1
+            print('Learn iteration: ', self.learn_iters)
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
