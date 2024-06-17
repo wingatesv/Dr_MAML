@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from methods.ppo_torch import Agent
+from gym import spaces
 
 class PPO_MAML(MetaTemplate):
     def __init__(self, model_func, n_way, n_support, env, approx=False, test_mode=False):
@@ -17,17 +18,22 @@ class PPO_MAML(MetaTemplate):
         self.classifier.bias.data.fill_(0)
         
         self.n_task = 4
-        self.task_update_num = 5 # for meta-testing
+        self.task_update_num = 5 if test_mode else 3
         self.train_lr = 0.01
         self.approx = approx
         self.test_mode = test_mode
         self.inner_loop_steps_list = []
-
         self.env = env
+        self.env = None
+        self.action_space = spaces.Discrete(5)
+        # Define observation space (train_loss)
+        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(1,), dtype=np.float32)
+
+
         # Placeholder for train and val losses
-        self.agent = Agent(n_actions=self.env.action_space.n, batch_size=5, 
+        self.agent = Agent(n_actions=self.action_space.n, batch_size=5, 
                     alpha=0.01, n_epochs=5, 
-                    input_dims=self.env.observation_space.shape)
+                    input_dims=self.observation_space.shape)
         
         self.current_train_loss = -1
         self.current_val_loss = -1
@@ -82,12 +88,24 @@ class PPO_MAML(MetaTemplate):
         avg_loss = 0
         task_count = 0
         loss_all = []
-
+        
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-        print('action:', self.action + 1)
+        print('action:', self.action+1)
         print('prob:', self.prob)
         print('val:', self.val)
+
+
+        # Apply action to task_update_num
+        # if self.action == 0:
+        #     self.task_update_num = max(1, self.task_update_num - 1)
+        # elif self.action == 1:
+        #     self.task_update_num = min(5, self.task_update_num + 1)
+        # print('task_update_num:', self.task_update_num)
+
+
         self.task_update_num = self.action + 1 # agent.step
+
+
         self.n_steps += 1
 
         optimizer.zero_grad()
