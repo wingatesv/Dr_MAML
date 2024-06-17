@@ -49,7 +49,7 @@ class PPOMemory:
 
 class ActorNetwork(nn.Module):
     def __init__(self, n_actions, input_dims, alpha,
-            fc1_dims=256, fc2_dims=256, chkpt_dir='tmp/ppo'):
+            fc1_dims=32, fc2_dims=32, chkpt_dir='/content/temp/ppo'):
         super(ActorNetwork, self).__init__()
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo')
@@ -79,8 +79,8 @@ class ActorNetwork(nn.Module):
         self.load_state_dict(T.load(self.checkpoint_file))
 
 class CriticNetwork(nn.Module):
-    def __init__(self, input_dims, alpha, fc1_dims=256, fc2_dims=256,
-            chkpt_dir='tmp/ppo'):
+    def __init__(self, input_dims, alpha, fc1_dims=32, fc2_dims=32,
+            chkpt_dir='/content/temp/ppo'):
         super(CriticNetwork, self).__init__()
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo')
@@ -141,6 +141,7 @@ class Agent:
         value = self.critic(state)
         action = dist.sample()
 
+
         probs = T.squeeze(dist.log_prob(action)).item()
         action = T.squeeze(action).item()
         value = T.squeeze(value).item()
@@ -163,14 +164,18 @@ class Agent:
                     a_t += discount*(reward_arr[k] + self.gamma*values[k+1]*\
                             (1-int(dones_arr[k])) - values[k])
                     discount *= self.gamma*self.gae_lambda
-                advantage[t] = a_t
+                # advantage[t] = a_t
+                advantage[t] = a_t.item() if isinstance(a_t, np.ndarray) else a_t
             advantage = T.tensor(advantage).to(self.actor.device)
 
             values = T.tensor(values).to(self.actor.device)
             for batch in batches:
                 states = T.tensor(state_arr[batch], dtype=T.float).to(self.actor.device)
+
                 old_probs = T.tensor(old_prob_arr[batch]).to(self.actor.device)
+
                 actions = T.tensor(action_arr[batch]).to(self.actor.device)
+         
 
                 dist = self.actor(states)
                 critic_value = self.critic(states)
