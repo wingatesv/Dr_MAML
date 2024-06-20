@@ -11,7 +11,7 @@ from methods.ppo_torch import Agent
 from gym import spaces
 
 class PPO_MAML(MetaTemplate):
-    def __init__(self, model_func, n_way, n_support, env, approx=False, test_mode=False):
+    def __init__(self, model_func, n_way, n_support, approx=False, test_mode=False):
         super(PPO_MAML, self).__init__(model_func, n_way, n_support, change_way=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -23,24 +23,35 @@ class PPO_MAML(MetaTemplate):
         self.approx = approx
         self.test_mode = test_mode
         self.inner_loop_steps_list = []
-        self.env = env
-        self.env = None
+
+        #Setup Environment
         self.action_space = spaces.Discrete(5)
-        # Define observation space (train_loss)
-        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(1,), dtype=np.float32)
-
-
-        # Placeholder for train and val losses
-        self.agent = Agent(n_actions=self.action_space.n, batch_size=5, 
-                    alpha=0.01, n_epochs=5, 
-                    input_dims=self.observation_space.shape)
+        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2,), dtype=np.float32)
+        self.state = np.zeros(2)
+        
+        # self.prob = 0
+        # self.val = 0
+        self.done = False
         
         self.current_train_loss = -1
         self.current_val_loss = -1
         self.n_steps = 0
         self.learn_iters = 0
         self.reward = 0
-        self.observation = np.array([self.current_train_loss])
+        self.score = 0
+        self.best_score = 0
+        
+        # self.observation = np.array([self.current_train_loss])
+            
+        # Setup Agent
+        self.agent = Agent(n_actions=self.action_space.n, batch_size=5, 
+                    alpha=0.01, n_epochs=5, 
+                    input_dims=self.observation_space.shape)
+
+    # Reset Env
+    def reset_env(self):
+        self.state = np.zeros(2)
+        return self.state
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -88,24 +99,13 @@ class PPO_MAML(MetaTemplate):
         avg_loss = 0
         task_count = 0
         loss_all = []
+
+        # reset environment
+        observation = self.reset_env()
         
-        self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-        print('action:', self.action+1)
-        print('prob:', self.prob)
-        print('val:', self.val)
-
-
-        # Apply action to task_update_num
-        # if self.action == 0:
-        #     self.task_update_num = max(1, self.task_update_num - 1)
-        # elif self.action == 1:
-        #     self.task_update_num = min(5, self.task_update_num + 1)
-        # print('task_update_num:', self.task_update_num)
 
 
         self.task_update_num = self.action + 1 # agent.step
-
-
         self.n_steps += 1
 
         optimizer.zero_grad()
@@ -113,6 +113,11 @@ class PPO_MAML(MetaTemplate):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
 
+            action, prob, val = self.agent.choose_action(observation)
+            print('action:', action)
+            print('prob:', prob)
+            print('val:', val)
+            
 
             loss = self.set_forward_loss(x)
             avg_loss += loss.item()
