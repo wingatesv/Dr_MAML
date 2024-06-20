@@ -1,4 +1,3 @@
-# This code is modified from https://github.com/dragen1860/MAML-Pytorch and https://github.com/katerakelly/pytorch-maml 
 import backbone
 import torch
 import torch.nn as nn
@@ -24,34 +23,19 @@ class PPO_MAML(MetaTemplate):
         self.test_mode = test_mode
         self.inner_loop_steps_list = []
 
-        #Setup Environment
+        # Setup Environment
         self.action_space = spaces.Discrete(5)
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2,), dtype=np.float32)
-        self.state = np.zeros(2)
         
-        # self.prob = 0
-        # self.val = 0
-        self.done = False
-        
-        self.current_train_loss = -1
-        self.current_val_loss = -1
-        self.n_steps = 0
+        self.score_history = []
         self.learn_iters = 0
-        self.reward = 0
-        self.score = 0
+        self.avg_score = 0
         self.best_score = 0
-        
-        # self.observation = np.array([self.current_train_loss])
-            
-        # Setup Agent
-        self.agent = Agent(n_actions=self.action_space.n, batch_size=5, 
-                    alpha=0.01, n_epochs=5, 
-                    input_dims=self.observation_space.shape)
 
-    # Reset Env
-    def reset_env(self):
-        self.state = np.zeros(2)
-        return self.state
+        # Setup Agent
+        self.agent = Agent(n_actions=self.action_space.n, batch_size=self.n_task, 
+                           alpha=0.01, n_epochs=5, 
+                           input_dims=self.observation_space.shape)
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -70,7 +54,7 @@ class PPO_MAML(MetaTemplate):
         for weight in self.parameters():
             weight.fast = None
         self.zero_grad()
-
+        support_losses = []
         for task_step in range(self.task_update_num):
             scores = self.forward(x_a_i)
             set_loss = self.loss_fn(scores, y_a_i)
@@ -85,67 +69,88 @@ class PPO_MAML(MetaTemplate):
                     weight.fast = weight.fast - self.train_lr * grad[k]
                 fast_parameters.append(weight.fast)
 
+            support_losses.append(set_loss)
+            
+        avg_support_loss = torch.mean(torch.stack(support_losses))
+        
         scores = self.forward(x_b_i)
-        return scores
+        return avg_support_loss, scores
 
     def set_forward_loss(self, x):
-        scores = self.set_forward(x, is_feature=False)
+        avg_support_loss, scores = self.set_forward(x, is_feature=False)
         y_b_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_query))).cuda()
-        loss = self.loss_fn(scores, y_b_i)
-        return loss
+        query_loss = self.loss_fn(scores, y_b_i)
+        return avg_support_loss, query_loss
 
     def train_loop(self, epoch, train_loader, optimizer):
         print_freq = 10
-        avg_loss = 0
+        avg_query_loss = 0
         task_count = 0
-        loss_all = []
+        all_query_loss = []
 
-        # reset environment
-        observation = self.reset_env()
-        
-
-
-        self.task_update_num = self.action + 1 # agent.step
-        self.n_steps += 1
+        # Reset environment
+        score = 0
+        done = False
+        observation = np.zeros(2)
 
         optimizer.zero_grad()
+        
         for i, (x, _) in enumerate(train_loader):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
 
             action, prob, val = self.agent.choose_action(observation)
-            print('action:', action)
+            self.task_update_num = action + 1  # agent.step
+            
+            print('action:', self.task_update_num)
             print('prob:', prob)
             print('val:', val)
-            
 
-            loss = self.set_forward_loss(x)
-            avg_loss += loss.item()
-            loss_all.append(loss)
+            avg_support_loss, query_loss = self.set_forward_loss(x)
+
+            observation_ = np.array([avg_support_loss.item(), query_loss.item()], dtype=np.float32)
+            print('observation: ', observation_)
+
+            reward = np.array([-query_loss.item()])
+            print('reward: ', reward)
+            
+            done = True if i == (len(train_loader) - 1) else False 
+            score += reward
+            self.agent.remember(observation, action, prob, val, reward, done)
+            
+            avg_query_loss += query_loss.item()
+            all_query_loss.append(query_loss)
 
             task_count += 1
             if task_count == self.n_task:
-                loss_q = torch.stack(loss_all).sum(0)
+                loss_q = torch.stack(all_query_loss).sum(0)
                 loss_value = loss_q.item()
                 loss_q.backward()
                 optimizer.step()
 
                 task_count = 0
-                loss_all = []
-            optimizer.zero_grad()
-            if i % print_freq == 0:
-                print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / float(i + 1):.6f}')
+                all_query_loss = []
 
-        self.current_train_loss = avg_loss/len(train_loader)
-        self.observation = np.array([self.current_train_loss])
-        print('observation: ', self.observation)
+                self.agent.learn()
+                self.learn_iters += 1
+                
+            optimizer.zero_grad()
+            observation = observation_
+            
+            if i % print_freq == 0:
+                print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_query_loss / float(i + 1):.6f}, Learn Iters {self.learn_iters}')
+
+        self.score_history.append(score)
+        self.avg_score = np.mean(self.score_history[-100:])
+
+        if self.avg_score > self.best_score:
+            self.best_score = self.avg_score
+            self.agent.save_models()
 
     def test_loop(self, test_loader, return_std=False):
         correct = 0
         count = 0
         avg_loss = 0
-        done = True
-        N = 5
         acc_all = []
 
         iter_num = len(test_loader)
@@ -161,18 +166,6 @@ class PPO_MAML(MetaTemplate):
         acc_std = np.std(acc_all)
         print(f'{iter_num} Test Acc = {acc_mean:.2f}% ± {1.96 * acc_std / np.sqrt(iter_num):.2f}%, Test Loss = {avg_loss / iter_num:.4f}')
 
-        
-        if not self.test_mode:
-            self.current_val_loss = avg_loss/len(test_loader)
-            self.reward = np.array([- self.current_val_loss])
-            print('reward: ', self.reward)
-            self.agent.remember(self.observation, self.action, self.prob, self.val, self.reward, done)
-
-            if self.n_steps % N == 0:
-                self.agent.learn()
-                self.learn_iters +=1
-            print('Learn iteration: ', self.learn_iters)
-        
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
         else:
