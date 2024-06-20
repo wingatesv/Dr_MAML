@@ -87,65 +87,59 @@ class PPO_MAML(MetaTemplate):
         avg_query_loss = 0
         task_count = 0
         all_query_loss = []
-
-        # Reset environment
+    
+        # reset environment
         score = 0
-        done = False
         observation = np.zeros(2)
-
+    
         optimizer.zero_grad()
-        
+    
         for i, (x, _) in enumerate(train_loader):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
-
+    
             action, prob, val = self.agent.choose_action(observation)
             self.task_update_num = action + 1  # agent.step
-            
-            print('action:', self.task_update_num)
-            print('prob:', prob)
-            print('val:', val)
-
+    
             avg_support_loss, query_loss = self.set_forward_loss(x)
-
+    
             observation_ = np.array([avg_support_loss.item(), query_loss.item()], dtype=np.float32)
-            print('observation: ', observation_)
-
-            reward = np.array([-query_loss.item()])
-            print('reward: ', reward)
+            reward = -query_loss.item()
+    
+            done = (i == len(train_loader) - 1)
+            print('Done: ', done)
             
-            done = True if i == (len(train_loader) - 1) else False 
             score += reward
             self.agent.remember(observation, action, prob, val, reward, done)
-            
+    
             avg_query_loss += query_loss.item()
             all_query_loss.append(query_loss)
-
+    
             task_count += 1
             if task_count == self.n_task:
                 loss_q = torch.stack(all_query_loss).sum(0)
-                loss_value = loss_q.item()
                 loss_q.backward()
                 optimizer.step()
-
+    
                 task_count = 0
                 all_query_loss = []
-
+    
                 self.agent.learn()
                 self.learn_iters += 1
-                
+    
             optimizer.zero_grad()
             observation = observation_
-            
+    
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_query_loss / float(i + 1):.6f}, Learn Iters {self.learn_iters}')
-
+    
         self.score_history.append(score)
         self.avg_score = np.mean(self.score_history[-100:])
-
+    
         if self.avg_score > self.best_score:
             self.best_score = self.avg_score
             self.agent.save_models()
+
 
     def test_loop(self, test_loader, return_std=False):
         correct = 0
