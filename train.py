@@ -203,6 +203,19 @@ if __name__=='__main__':
     print(f'Applying {params.train_aug} Data Augmentation ......')
     print(f'Applying StainNet stain normalization......') if params.sn else print()
     
+    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    if params.train_aug:
+        params.checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
+        params.checkpoint_dir += '_stainnet'
+    if params.anneal_param != 'none':
+        params.checkpoint_dir += f'_{params.anneal_param}'
+    if not params.method  in ['baseline', 'baseline++']: 
+        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
+
+    if not os.path.isdir(params.checkpoint_dir):
+        os.makedirs(params.checkpoint_dir)
+
     if params.method in ['baseline', 'baseline++'] :
       base_datamgr    = SimpleDataManager(image_size, batch_size = 16)
       base_loader     = base_datamgr.get_data_loader( base_file , aug = params.train_aug, sn = params.sn)
@@ -254,7 +267,7 @@ if __name__=='__main__':
             model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
 
           elif params.method == 'ppo_maml':
-            model = PPO_MAML(  model_dict[params.model], approx = False, **train_few_shot_params )
+            model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = params.checkpoint_dir, **train_few_shot_params )
        
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
@@ -298,40 +311,10 @@ if __name__=='__main__':
         else:
           raise ValueError('Unknown method')
 
-
-    # get a batch of images
-    # images, _ = next(iter(base_loader))
-    # print(images.shape)
-
-
-    # # create a grid of images
-    # grid = vutils.make_grid(images, normalize=True)
-
-    # # display the grid of images
-    # plt.imshow(grid.permute(1,2,0))
-    # plt.axis('off')
-    # plt.savefig('image.png')
- 
-
     
     model = model.cuda()
 
-    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
-    if params.train_aug:
-        params.checkpoint_dir += f'_{params.train_aug}'
-    if params.sn:
-        params.checkpoint_dir += '_stainnet'
-    if params.anneal_param != 'none':
-        params.checkpoint_dir += f'_{params.anneal_param}'
-    if not params.method  in ['baseline', 'baseline++']: 
-        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
-    if not os.path.isdir(params.checkpoint_dir):
-        os.makedirs(params.checkpoint_dir)
-
-    #Set agent saving directory
-    if params.method == 'ppo_maml':
-        model.agent_chkpt_dir =  params.checkpoint_dir
 
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch
