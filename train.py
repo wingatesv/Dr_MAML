@@ -32,7 +32,7 @@ import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
 from methods.ppo_maml import PPO_MAML
-from methods.environment import MAMLEnv
+
 
 
 def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
@@ -254,7 +254,7 @@ if __name__=='__main__':
             model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
 
           elif params.method == 'ppo_maml':
-            model = PPO_MAML(  model_dict[params.model], approx = False, env  = MAMLEnv(), **train_few_shot_params )
+            model = PPO_MAML(  model_dict[params.model], approx = False, **train_few_shot_params )
        
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
@@ -328,6 +328,10 @@ if __name__=='__main__':
 
     if not os.path.isdir(params.checkpoint_dir):
         os.makedirs(params.checkpoint_dir)
+
+    #Set agent saving directory
+    if params.method == 'ppo_maml':
+        model.agent_chkpt_dir =  params.checkpoint_dir
 
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch
