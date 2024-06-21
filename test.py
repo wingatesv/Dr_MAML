@@ -69,11 +69,26 @@ if __name__ == '__main__':
     params = parse_args('test')
     print(f'Applying StainNet stain normalization......') if params.sn else print()
 
+
+    if params.dataset == 'cross_IDC':
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, 'BreaKHis_40x_2', params.model, params.method)
+    else:
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+        
+    if params.train_aug:
+        checkpoint_dir += f'_{params.train_aug}'
+    if params.anneal_param != 'none':
+        checkpoint_dir += f'_{params.anneal_param}'
+    if params.sn:
+        checkpoint_dir += '_stainnet'
+
+    if not params.method in ['baseline', 'baseline++'] :
+        checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
+
     acc_all = []
     iter_num = 600
 
     few_shot_params = dict(n_way = params.test_n_way , n_support = params.n_shot) 
-
 
     if params.method == 'baseline':
         model = BaselineFinetune( model_dict[params.model], **few_shot_params )
@@ -107,7 +122,7 @@ if __name__ == '__main__':
         model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
 
       elif params.method == 'ppo_maml':
-        model = PPO_MAML(  model_dict[params.model], approx = False,  **few_shot_params )
+        model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = checkpoint_dir, **few_shot_params )
 
       elif params.method == 'annemaml':     
         if params.anneal_param != 'none':
@@ -148,22 +163,6 @@ if __name__ == '__main__':
 
     model = model.cuda()
 
-    if params.dataset == 'cross_IDC':
-        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, 'BreaKHis_40x_2', params.model, params.method)
-    else:
-        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
-        
-    if params.train_aug:
-        checkpoint_dir += f'_{params.train_aug}'
-    if params.anneal_param != 'none':
-        checkpoint_dir += f'_{params.anneal_param}'
-    if params.sn:
-        checkpoint_dir += '_stainnet'
-
-    if not params.method in ['baseline', 'baseline++'] :
-        checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
-
-
     if not params.method in ['baseline', 'baseline++'] : 
         if params.save_iter != -1:
             modelfile   = get_assigned_file(checkpoint_dir,params.save_iter)
@@ -181,8 +180,6 @@ if __name__ == '__main__':
     else:
         split_str = split
 
-    if params.method == 'ppo_maml':
-        model.agent_chkpy_dir = checkpoint_dir
         
     if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']: #maml do not support testing with feature
         if 'Conv' in params.model:
