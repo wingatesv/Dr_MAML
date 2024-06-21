@@ -34,8 +34,8 @@ class PPO_MAML(MetaTemplate):
         self.n_steps = 0
         self.score_history = []
         self.learn_iters = 0
-        self.avg_score = 0
-        self.best_score = 0
+        self.avg_score = -float('inf')
+        self.best_score = -float('inf')
 
         # Setup Agent
         self.agent = Agent(n_actions=self.action_space.n,
@@ -178,11 +178,11 @@ class PPO_MAML(MetaTemplate):
         acc_all = []
 
         # Load the best agent model
-        actor_checkpoint_file = os.path.join(self.agent_chkpt_dir, 'actor_torch_ppo')
-        critic_checkpoint_file = os.path.join(self.agent_chkpt_dir, 'critic_torch_ppo')
-        if os.path.isdir(actor_checkpoint_file) and os.path.isdir(critic_checkpoint_file):
+        if os.path.isdir(self.agent_chkpt_dir):
             self.agent.load_models()
             print('best agent loaded ...')
+        else:
+          print('no best agent checkpoint found')
 
 
         iter_num = len(test_loader)
