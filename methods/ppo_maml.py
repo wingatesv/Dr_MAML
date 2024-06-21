@@ -11,7 +11,7 @@ from methods.ppo_torch import Agent
 from gym import spaces
 
 class PPO_MAML(MetaTemplate):
-    def __init__(self, model_func, n_way, n_support, approx=False, agent_chkpt_dir = '/content/temp'):
+    def __init__(self, model_func, n_way, n_support, approx=False, agent_chkpt_dir = None):
         super(PPO_MAML, self).__init__(model_func, n_way, n_support, change_way=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -40,7 +40,7 @@ class PPO_MAML(MetaTemplate):
         # Setup Agent
         self.agent = Agent(n_actions=self.action_space.n,
                            input_dims=self.observation_space.shape,
-                           chkpt_dir = agent_chkpt_dir,
+                           chkpt_dir = self.agent_chkpt_dir,
                            alpha=0.01,
                            batch_size= 5, 
                            n_epochs=5, 
@@ -110,13 +110,17 @@ class PPO_MAML(MetaTemplate):
     
             action, prob, val = self.agent.choose_action(observation)
             self.task_update_num = action + 1  # agent.step
+
+            # print(f'action: {self.task_update_num}, prob: {prob}, val: {val}')
     
             avg_support_loss, query_loss = self.set_forward_loss(x)
     
             observation_ = np.array([self.task_update_num, avg_support_loss.item(), query_loss.item()], dtype=np.float32)
+            # print('Observation: ', observation)
             reward = -query_loss.item()
+            # print('Reward: ', reward)
             done = (i == len(train_loader) - 1)
-            print('Done: ', done)
+       
 
             self.n_steps += 1
             score += reward
@@ -143,13 +147,15 @@ class PPO_MAML(MetaTemplate):
     
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_query_loss / float(i + 1):.6f}')
-    
+
+        print(f'Epoch {epoch} | Batch {len(train_loader)}/{len(train_loader)} | Avg Loss {(avg_query_loss / len(train_loader)):.6f}')
         self.score_history.append(score)
         self.avg_score = np.mean(self.score_history[-100:])
     
         if self.avg_score > self.best_score:
             self.best_score = self.avg_score
             self.agent.save_models()
+            print("best agent! save...")
 
         print('Episode', epoch, 'Score %.1f' % score, 'Avg score %.1f' % self.avg_score,'Time steps', self.n_steps, 'learning_steps', self.learn_iters)
             
@@ -163,7 +169,7 @@ class PPO_MAML(MetaTemplate):
         topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
         topk_ind = topk_labels.cpu().numpy()
         top1_correct = np.sum(topk_ind[:,0] == y_query)
-        return float(top1_correct), len(y_query), query_loss
+        return float(top1_correct), len(y_query), avg_support_loss, query_loss
 
     def test_loop(self, test_loader, return_std=False):
         correct = 0
@@ -172,7 +178,12 @@ class PPO_MAML(MetaTemplate):
         acc_all = []
 
         # Load the best agent model
-        self.agent.load_models()
+        actor_checkpoint_file = os.path.join(self.agent_chkpt_dir, 'actor_torch_ppo')
+        critic_checkpoint_file = os.path.join(self.agent_chkpt_dir, 'critic_torch_ppo')
+        if os.path.isdir(actor_checkpoint_file) and os.path.isdir(critic_checkpoint_file):
+            self.agent.load_models()
+            print('best agent loaded ...')
+
 
         iter_num = len(test_loader)
         observation = np.zeros(self.number_of_observations)
@@ -184,11 +195,11 @@ class PPO_MAML(MetaTemplate):
             action, prob, val = self.agent.choose_action(observation)
             self.task_update_num = action + 1  # agent.step
             
-            correct_this, count_this, loss = self.correct(x)
+            correct_this, count_this, avg_support_loss, query_loss = self.correct(x)
             acc_all.append(correct_this / count_this * 100)
-            avg_loss += loss.item()
+            avg_loss += query_loss.item()
 
-            observation_ = np.array([loss.item(), loss.item()], dtype=np.float32)
+            observation_ = np.array([self.task_update_num, avg_support_loss.item(), query_loss.item()], dtype=np.float32)
             observation = observation_
 
         acc_all = np.asarray(acc_all)
