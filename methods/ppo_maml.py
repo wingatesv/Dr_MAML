@@ -110,7 +110,6 @@ class PPO_MAML(MetaTemplate):
     
             action, prob, val = self.agent.choose_action(observation)
             self.task_update_num = action + 1  # agent.step
-
             # print(f'action: {self.task_update_num}, prob: {prob}, val: {val}')
     
             avg_support_loss, query_loss = self.set_forward_loss(x)
