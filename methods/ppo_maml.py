@@ -90,7 +90,26 @@ class PPO_MAML(MetaTemplate):
         y_b_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_query))).cuda()
         query_loss = self.loss_fn(scores, y_b_i)
         return avg_support_loss, query_loss
+        
+    def compute_task_state (self, x):
+        x = x.cuda()
+        x_var = Variable(x)
+        x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:]) 
+        y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()
 
+        with torch.no_grad():
+            score = self.forward(x_a_i)
+            loss = self.loss(score, y_a_i)
+
+        support_mean = x_a_i.mean().item()
+        support_std = x_a_i.std().item()
+
+        observation = np.array([loss.item(), support_mean, support_std)], dtype=np.float32)
+        print('Tasks state: ',observation)
+        
+        return observation
+        
+    
     def train_loop(self, epoch, train_loader, optimizer):
         print_freq = 10
         avg_query_loss = 0
@@ -107,6 +126,9 @@ class PPO_MAML(MetaTemplate):
         for i, (x, _) in enumerate(train_loader):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
+
+            # get task difficulty, mean and std
+            observation = self.compute_task_state(x)
     
             action, prob, val = self.agent.choose_action(observation)
             self.task_update_num = action + 1  # agent.step
@@ -114,7 +136,7 @@ class PPO_MAML(MetaTemplate):
     
             avg_support_loss, query_loss = self.set_forward_loss(x)
     
-            observation_ = np.array([self.task_update_num, avg_support_loss.item(), query_loss.item()], dtype=np.float32)
+            # observation_ = np.array([self.task_update_num, avg_support_loss.item(), query_loss.item()], dtype=np.float32)
             # print('Observation: ', observation)
             reward = -query_loss.item()
             # print('Reward: ', reward)
@@ -142,7 +164,7 @@ class PPO_MAML(MetaTemplate):
                 self.learn_iters += 1
         
             optimizer.zero_grad()
-            observation = observation_
+            # observation = observation_
     
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_query_loss / float(i + 1):.6f}')
