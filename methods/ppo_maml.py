@@ -105,7 +105,7 @@ class PPO_MAML(MetaTemplate):
         support_std = x_a_i.std().item()
 
         observation = np.array([loss.item(), support_mean, support_std], dtype=np.float32)
-        print('Tasks state: ',observation)
+        # print('Tasks state: ',observation)
         
         return observation
         
@@ -213,6 +213,8 @@ class PPO_MAML(MetaTemplate):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
 
+            observation = self.compute_task_state(x)
+
             action, prob, val = self.agent.choose_action(observation)
             self.task_update_num = action + 1  # agent.step
             
@@ -220,8 +222,8 @@ class PPO_MAML(MetaTemplate):
             acc_all.append(correct_this / count_this * 100)
             avg_loss += query_loss.item()
 
-            observation_ = np.array([self.task_update_num, avg_support_loss.item(), query_loss.item()], dtype=np.float32)
-            observation = observation_
+            # observation_ = np.array([self.task_update_num, avg_support_loss.item(), query_loss.item()], dtype=np.float32)
+            # observation = observation_
 
         acc_all = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
