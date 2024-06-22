@@ -11,7 +11,7 @@ from methods.ppo_torch import Agent
 from gym import spaces
 
 class PPO_MAML(MetaTemplate):
-    def __init__(self, model_func, n_way, n_support, env, approx=False, test_mode=False):
+    def __init__(self, model_func, n_way, n_support, approx=False,  agent_chkpt_dir = None, test_mode=False):
         super(PPO_MAML, self).__init__(model_func, n_way, n_support, change_way=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -22,25 +22,24 @@ class PPO_MAML(MetaTemplate):
         self.train_lr = 0.01
         self.approx = approx
         self.test_mode = test_mode
-        self.inner_loop_steps_list = []
-        self.env = env
-        self.env = None
-        self.action_space = spaces.Discrete(5)
-        # Define observation space (train_loss)
-        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(1,), dtype=np.float32)
-
-
-        # Placeholder for train and val losses
-        self.agent = Agent(n_actions=self.action_space.n, batch_size=5, 
-                    alpha=0.01, n_epochs=5, 
-                    input_dims=self.observation_space.shape)
         
-        self.current_train_loss = -1
-        self.current_val_loss = -1
+        self.action_space = spaces.Discrete(5)
+        self.number_of_observations = 1
+        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.number_of_observations,), dtype=np.float32)
+
+        # Setup Agent
+        self.agent = Agent(n_actions=self.action_space.n,
+                           input_dims=self.observation_space.shape,
+                           chkpt_dir = self.agent_chkpt_dir,
+                           alpha=0.01,
+                           batch_size= 5, 
+                           n_epochs=5, 
+                           fc_dims=32 )
+        
         self.n_steps = 0
+        self.score_history = []
         self.learn_iters = 0
-        self.reward = 0
-        self.observation = np.array([self.current_train_loss])
+
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -90,22 +89,7 @@ class PPO_MAML(MetaTemplate):
         loss_all = []
         
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-        print('action:', self.action+1)
-        print('prob:', self.prob)
-        print('val:', self.val)
-
-
-        # Apply action to task_update_num
-        # if self.action == 0:
-        #     self.task_update_num = max(1, self.task_update_num - 1)
-        # elif self.action == 1:
-        #     self.task_update_num = min(5, self.task_update_num + 1)
-        # print('task_update_num:', self.task_update_num)
-
-
         self.task_update_num = self.action + 1 # agent.step
-
-
         self.n_steps += 1
 
         optimizer.zero_grad()
@@ -131,15 +115,16 @@ class PPO_MAML(MetaTemplate):
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / float(i + 1):.6f}')
 
-        self.current_train_loss = avg_loss/len(train_loader)
-        self.observation = np.array([self.current_train_loss])
-        print('observation: ', self.observation)
+        print(f'Epoch {epoch} | Batch {len(train_loader)}/{len(train_loader)} | Avg Loss {(avg_loss / len(train_loader)):.6f}')
+
+        self.observation = np.array([avg_loss/len(train_loader)])
+        # print('observation: ', self.observation)
 
     def test_loop(self, test_loader, return_std=False):
         correct = 0
         count = 0
         avg_loss = 0
-        done = True
+        done = False
         N = 5
         acc_all = []
 
@@ -158,15 +143,13 @@ class PPO_MAML(MetaTemplate):
 
         
         if not self.test_mode:
-            self.current_val_loss = avg_loss/len(test_loader)
-            self.reward = np.array([- self.current_val_loss])
-            print('reward: ', self.reward)
-            self.agent.remember(self.observation, self.action, self.prob, self.val, self.reward, done)
+            reward = np.array([- (avg_loss/len(test_loader))])
+            self.agent.remember(self.observation, self.action, self.prob, self.val, reward, done)
 
             if self.n_steps % N == 0:
                 self.agent.learn()
                 self.learn_iters +=1
-            print('Learn iteration: ', self.learn_iters)
+                print('Learn iteration: ', self.learn_iters)
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
