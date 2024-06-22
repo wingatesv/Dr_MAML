@@ -104,7 +104,7 @@ class PPO_MAML(MetaTemplate):
         support_mean = x_a_i.mean().item()
         support_std = x_a_i.std().item()
 
-        observation = np.array([loss.item(), support_mean, support_std)], dtype=np.float32)
+        observation = np.array([loss.item(), support_mean, support_std], dtype=np.float32)
         print('Tasks state: ',observation)
         
         return observation
