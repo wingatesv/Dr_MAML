@@ -99,7 +99,7 @@ class PPO_MAML(MetaTemplate):
 
         with torch.no_grad():
             score = self.forward(x_a_i)
-            loss = self.loss(score, y_a_i)
+            loss = self.loss_fn(score, y_a_i)
 
         support_mean = x_a_i.mean().item()
         support_std = x_a_i.std().item()
