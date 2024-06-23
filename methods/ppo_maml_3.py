@@ -30,7 +30,7 @@ class PPO_MAML(MetaTemplate):
         # Setup Agent
         self.agent = Agent(n_actions=self.action_space.n,
                            input_dims=self.observation_space.shape,
-                           chkpt_dir = self.agent_chkpt_dir,
+                           chkpt_dir = agent_chkpt_dir,
                            alpha=0.01,
                            batch_size= 5, 
                            n_epochs=5, 
@@ -39,7 +39,7 @@ class PPO_MAML(MetaTemplate):
         self.n_steps = 0
         self.score_history = []
         self.learn_iters = 0
-
+        self.observation = np.array([-1])
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -87,6 +87,7 @@ class PPO_MAML(MetaTemplate):
         avg_loss = 0
         task_count = 0
         loss_all = []
+        
         
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
         self.task_update_num = self.action + 1 # agent.step
