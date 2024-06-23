@@ -11,7 +11,7 @@ from methods.ppo_torch import Agent
 from gym import spaces
 
 class PPO_MAML(MetaTemplate):
-    def __init__(self, model_func, n_way, n_support, approx=False, agent_chkpt_dir = None):
+    def __init__(self, model_func, n_way, n_support, approx=False, agent_chkpt_dir = None, test_mode = False):
         super(PPO_MAML, self).__init__(model_func, n_way, n_support, change_way=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
