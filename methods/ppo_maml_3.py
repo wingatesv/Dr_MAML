@@ -25,6 +25,7 @@ class PPO_MAML(MetaTemplate):
         
         self.action_space = spaces.Discrete(5)
         self.number_of_observations = 1
+        # self.number_of_observations = 3
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.number_of_observations,), dtype=np.float32)
 
         # Setup Agent
@@ -119,6 +120,7 @@ class PPO_MAML(MetaTemplate):
         print(f'Epoch {epoch} | Batch {len(train_loader)}/{len(train_loader)} | Avg Loss {(avg_loss / len(train_loader)):.6f}')
 
         self.observation = np.array([avg_loss/len(train_loader)])
+        # self.observation = np.array([self.task_update_num, avg_loss/len(train_loader)])
         # print('observation: ', self.observation)
 
     def test_loop(self, test_loader, return_std=False):
