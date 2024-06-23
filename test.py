@@ -122,7 +122,7 @@ if __name__ == '__main__':
         model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
 
       elif params.method == 'ppo_maml':
-        model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = checkpoint_dir, **few_shot_params )
+        model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = checkpoint_dir, test_mode = True, **few_shot_params )
 
       elif params.method == 'annemaml':     
         if params.anneal_param != 'none':
