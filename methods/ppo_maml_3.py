@@ -23,8 +23,8 @@ class PPO_MAML(MetaTemplate):
         self.approx = approx
         self.test_mode = test_mode
         
-        self.action_space = spaces.Discrete(5)
-        self.number_of_observations = 1
+        self.action_space = spaces.Discrete(3)
+        self.number_of_observations = 3
         # self.number_of_observations = 3
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.number_of_observations,), dtype=np.float32)
 
@@ -40,7 +40,7 @@ class PPO_MAML(MetaTemplate):
         self.n_steps = 0
         self.score_history = []
         self.learn_iters = 0
-        self.observation = np.array([-1])
+        self.observation = np.full(self.number_of_observations, -1)
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -91,7 +91,14 @@ class PPO_MAML(MetaTemplate):
         
         
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-        self.task_update_num = self.action + 1 # agent.step
+        # self.task_update_num = self.action + 1 # agent.step
+        # Apply action to task_update_num
+        if self.action == 0:
+            self.task_update_num = max(1, self.task_update_num - 1)
+        elif self.action == 1:
+            self.task_update_num = min(5, self.task_update_num + 1)
+        print('task_update_num:', self.task_update_num)
+
         self.n_steps += 1
 
         optimizer.zero_grad()
@@ -119,7 +126,12 @@ class PPO_MAML(MetaTemplate):
 
         print(f'Epoch {epoch} | Batch {len(train_loader)}/{len(train_loader)} | Avg Loss {(avg_loss / len(train_loader)):.6f}')
 
-        self.observation = np.array([avg_loss/len(train_loader)])
+        classifier_weights = list(self.classifier.parameters())[-2]
+        weights_mean = torch.mean(classifier_weights.data).detach().cpu().numpy()
+        weights_variance = torch.var(classifier_weights.data).detach().cpu().numpy()
+
+        # output_layer_weights.var().cpu().data,
+        self.observation = np.array([avg_loss/len(train_loader), weights_mean, weights_variance])
         # self.observation = np.array([self.task_update_num, avg_loss/len(train_loader)])
         # print('observation: ', self.observation)
 
@@ -128,7 +140,7 @@ class PPO_MAML(MetaTemplate):
         count = 0
         avg_loss = 0
         done = False
-        N = 5
+        N = 1
         acc_all = []
 
         iter_num = len(test_loader)
