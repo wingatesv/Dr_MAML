@@ -9,6 +9,7 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from methods.ppo_torch import Agent
 from gym import spaces
+import math
 
 class PPO_MAML(MetaTemplate):
     def __init__(self, model_func, n_way, n_support, approx=False,  agent_chkpt_dir = None, test_mode=False):
@@ -24,7 +25,7 @@ class PPO_MAML(MetaTemplate):
         self.test_mode = test_mode
         
         self.action_space = spaces.Discrete(3)
-        self.number_of_observations = 3
+        self.number_of_observations = 2
         # self.number_of_observations = 3
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.number_of_observations,), dtype=np.float32)
 
@@ -91,12 +92,11 @@ class PPO_MAML(MetaTemplate):
         
         
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-        # self.task_update_num = self.action + 1 # agent.step
-        # Apply action to task_update_num
-        if self.action == 0:
-            self.task_update_num = max(1, self.task_update_num - 1)
-        elif self.action == 1:
-            self.task_update_num = min(5, self.task_update_num + 1)
+
+
+        self.task_update_num = self.action + 1 # agent.step
+
+      
         print('task_update_num:', self.task_update_num)
 
         self.n_steps += 1
@@ -131,7 +131,7 @@ class PPO_MAML(MetaTemplate):
         weights_variance = torch.var(classifier_weights.data).detach().cpu().numpy()
 
         # output_layer_weights.var().cpu().data,
-        self.observation = np.array([avg_loss/len(train_loader), weights_mean, weights_variance])
+        self.observation = np.array([avg_loss/len(train_loader), epoch])
         # self.observation = np.array([self.task_update_num, avg_loss/len(train_loader)])
         # print('observation: ', self.observation)
 
@@ -139,8 +139,8 @@ class PPO_MAML(MetaTemplate):
         correct = 0
         count = 0
         avg_loss = 0
-        done = False
-        N = 1
+        done = True
+        N = 5
         acc_all = []
 
         iter_num = len(test_loader)
@@ -158,7 +158,8 @@ class PPO_MAML(MetaTemplate):
 
         
         if not self.test_mode:
-            reward = np.array([- (avg_loss/len(test_loader))])
+            amp_reward = math.pow(64, (acc_mean / 100) - 1) 
+            reward = np.array([acc_mean/100])
             self.agent.remember(self.observation, self.action, self.prob, self.val, reward, done)
 
             if self.n_steps % N == 0:
