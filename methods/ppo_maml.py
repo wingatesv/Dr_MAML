@@ -109,9 +109,9 @@ class PPO_MAML(MetaTemplate):
         
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
 
-        if train_counter == 1:
+        if train_counter == 0:
             self.task_update_num = self.annealing_func(5, 1, 0.4, epoch, atype='tra')
-        elif train_counter == 2:
+        elif train_counter == 1:
             self.task_update_num = self.annealing_func(5, 1, 0.4, epoch, atype= 'up_tra')
         else:
             self.task_update_num = self.action + 1 # agent.step
@@ -177,7 +177,7 @@ class PPO_MAML(MetaTemplate):
             reward = np.array([acc_mean/100])
             self.agent.remember(self.observation, self.action, self.prob, self.val, reward, done)
 
-            if self.train_counter < 3:
+            if self.train_counter < 2:
                 if self.epoch % 50 == 0:
                     self.agent.learn(n_epoch = 50)
                     self.learn_iters +=1
