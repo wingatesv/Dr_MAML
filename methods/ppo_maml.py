@@ -179,13 +179,13 @@ class PPO_MAML(MetaTemplate):
 
             if self.train_counter < 2:
                 if self.current_epoch % 50 == 0:
-                    self.agent.learn(n_epoch = 50)
+                    self.agent.learn(n_epochs = 50)
                     self.learn_iters +=1
                     print('Learn iteration: ', self.learn_iters)
                     
             else:
                 if self.n_steps % N == 0:
-                    self.agent.learn(n_epoch = 5)
+                    self.agent.learn(n_epochs = 5)
                     self.learn_iters +=1
                     print('Learn iteration: ', self.learn_iters)
         
