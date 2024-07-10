@@ -109,10 +109,9 @@ class CriticNetwork(nn.Module):
 
 class Agent:
     def __init__(self, n_actions, input_dims, chkpt_dir, gamma=0.99, alpha=0.0003, gae_lambda=0.95,
-            policy_clip=0.2, batch_size=64, n_epochs=10, fc_dims=32):
+            policy_clip=0.2, batch_size=64, fc_dims=32):
         self.gamma = gamma
         self.policy_clip = policy_clip
-        self.n_epochs = n_epochs
         self.gae_lambda = gae_lambda
 
         self.actor = ActorNetwork(n_actions, input_dims, alpha, fc_dims, fc_dims, chkpt_dir)
@@ -146,8 +145,8 @@ class Agent:
 
         return action, probs, value
 
-    def learn(self):
-        for _ in range(self.n_epochs):
+    def learn(self, n_epoch):
+        for _ in range(n_epochs):
             state_arr, action_arr, old_prob_arr, vals_arr,\
             reward_arr, dones_arr, batches = \
                     self.memory.generate_batches()
