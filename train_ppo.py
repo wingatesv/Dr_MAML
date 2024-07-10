@@ -327,5 +327,6 @@ if __name__=='__main__':
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
 
-for train_counter in range(3):
-    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, train_counter, params)
+    for train_counter in range(3):
+        print('Training phase: ', train_counter)
+        model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, train_counter, params)
