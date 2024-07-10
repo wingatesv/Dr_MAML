@@ -9,6 +9,7 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from methods.ppo_torch import Agent
 from gym import spaces
+from methods.trap_step_scheduler import half_trapezoidal_step_scheduler, new_trapezoidal_step_scheduler
 import math
 
 class PPO_MAML(MetaTemplate):
@@ -24,7 +25,7 @@ class PPO_MAML(MetaTemplate):
         self.approx = approx
         self.test_mode = test_mode
         
-        self.action_space = spaces.Discrete(3)
+        self.action_space = spaces.Discrete(5)
         self.number_of_observations = 2
         # self.number_of_observations = 3
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.number_of_observations,), dtype=np.float32)
@@ -35,14 +36,27 @@ class PPO_MAML(MetaTemplate):
                            chkpt_dir = agent_chkpt_dir,
                            alpha=0.01,
                            batch_size= 5, 
-                           n_epochs=5, 
                            fc_dims=32 )
         
         self.n_steps = 0
         self.score_history = []
         self.learn_iters = 0
         self.observation = np.full(self.number_of_observations, -1)
+        
+    def annealing_func(self, max_step, min_step, max_step_width, current_epoch, atype=None):
+      epochs = 200
+      if atype == 'tra':
+          return new_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = max_step, min_step = min_step, max_step_width = max_step_width)
 
+      elif atype == 'up_tra':
+          return half_trapezoidal_step_scheduler(total_epochs = epochs, current_epoch = current_epoch, max_step = max_step, min_step = min_step, max_step_width = max_step_width, half_right=True)
+    
+    def set_train_counter(self, train_counter):
+        self.train_counter = train_counter
+        
+    def set_epoch(self, epoch):
+        self.current_epoch = epoch
+        
     def forward(self, x):
         out = self.feature.forward(x)
         scores = self.classifier.forward(out)
@@ -84,22 +98,27 @@ class PPO_MAML(MetaTemplate):
         loss = self.loss_fn(scores, y_b_i)
         return loss
 
-    def train_loop(self, epoch, train_loader, optimizer):
+    def train_loop(self, epoch, train_loader, optimizer, train_counter):
         print_freq = 10
         avg_loss = 0
         task_count = 0
         loss_all = []
         
+        self.set_train_counter(train_counter)
+        self.set_epoch(epoch)
         
         self.action, self.prob, self.val = self.agent.choose_action(self.observation)
 
-
-        self.task_update_num = self.action + 1 # agent.step
-
-      
+        if train_counter == 1:
+            self.task_update_num = self.annealing_func(5, 1, 0.4, epoch, atype='tra')
+        elif train_counter == 2:
+            self.task_update_num = self.annealing_func(5, 1, 0.4, epoch, atype= 'up_tra')
+        else:
+            self.task_update_num = self.action + 1 # agent.step
+            self.n_steps += 1
+            
         print('task_update_num:', self.task_update_num)
 
-        self.n_steps += 1
 
         optimizer.zero_grad()
         for i, (x, _) in enumerate(train_loader):
@@ -126,11 +145,7 @@ class PPO_MAML(MetaTemplate):
 
         print(f'Epoch {epoch} | Batch {len(train_loader)}/{len(train_loader)} | Avg Loss {(avg_loss / len(train_loader)):.6f}')
 
-        classifier_weights = list(self.classifier.parameters())[-2]
-        weights_mean = torch.mean(classifier_weights.data).detach().cpu().numpy()
-        weights_variance = torch.var(classifier_weights.data).detach().cpu().numpy()
 
-        # output_layer_weights.var().cpu().data,
         self.observation = np.array([avg_loss/len(train_loader), epoch])
         # self.observation = np.array([self.task_update_num, avg_loss/len(train_loader)])
         # print('observation: ', self.observation)
@@ -162,10 +177,17 @@ class PPO_MAML(MetaTemplate):
             reward = np.array([acc_mean/100])
             self.agent.remember(self.observation, self.action, self.prob, self.val, reward, done)
 
-            if self.n_steps % N == 0:
-                self.agent.learn()
-                self.learn_iters +=1
-                print('Learn iteration: ', self.learn_iters)
+            if self.train_counter < 3:
+                if self.epoch % 50 == 0:
+                    self.agent.learn(n_epoch = 50)
+                    self.learn_iters +=1
+                    print('Learn iteration: ', self.learn_iters)
+                    
+            else:
+                if self.n_steps % N == 0:
+                    self.agent.learn(n_epoch = 5)
+                    self.learn_iters +=1
+                    print('Learn iteration: ', self.learn_iters)
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
