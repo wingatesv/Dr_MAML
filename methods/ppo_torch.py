@@ -145,7 +145,7 @@ class Agent:
 
         return action, probs, value
 
-    def learn(self, n_epoch):
+    def learn(self, n_epochs):
         for _ in range(n_epochs):
             state_arr, action_arr, old_prob_arr, vals_arr,\
             reward_arr, dones_arr, batches = \
