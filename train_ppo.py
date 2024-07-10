@@ -81,21 +81,23 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
           log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}, Validation Loss: {avg_loss:.4f}\n')
 
+        # only save at last training phase
+        if train_counter < 2: 
 
-        if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
-            print("best model! save...")
-            max_acc = acc
-            early_stopping_counter = 0
-            outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
-
-        elif acc == -1: #for baseline and baseline++
-          pass
-
-        else:
-          # Skip early stopping check during warm-up period
-          if epoch >= warmup_epochs:
-               early_stopping_counter += 1
+            if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
+                print("best model! save...")
+                max_acc = acc
+                early_stopping_counter = 0
+                outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
+                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+    
+            elif acc == -1: #for baseline and baseline++
+              pass
+    
+            else:
+              # Skip early stopping check during warm-up period
+              if epoch >= warmup_epochs:
+                   early_stopping_counter += 1
 
         # # If validation accuracy hasn't improved for patience epochs, increase patience
         # if early_stopping_counter >= patience and epoch >= warmup_epochs:
