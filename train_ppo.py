@@ -23,7 +23,7 @@ from methods.baselinefinetune import BaselineFinetune
 from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
-# from methods.maml import MAML
+from methods.maml import MAML
 from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
@@ -31,11 +31,11 @@ from methods.xmaml import XMAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
-from methods.ppo_maml import MAML
-from methods.environment import MAMLEnv
+from methods.ppo_maml import PPO_MAML
 
 
-def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
+
+def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, train_counter, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
     learning_rate = 0.0001
     if optimization == 'Adam':
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
@@ -64,20 +64,18 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         log_file.write(f'Time: {timestamp_start}, Training Start\n')
 
 
-    
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
         model.train()
-        model.train_loop(epoch, base_loader,  optimizer) #model are called by reference, no need to return 
-   
+        model.train_loop(epoch, base_loader,  optimizer, train_counter) #model are called by reference, no need to return 
+        # annealing_rate = model.get_annealing_rate()
+
         model.eval()
 
         if not os.path.isdir(params.checkpoint_dir):
             os.makedirs(params.checkpoint_dir)
 
         acc, avg_loss = model.test_loop(val_loader)
-
-
    
         # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
@@ -99,12 +97,12 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           if epoch >= warmup_epochs:
                early_stopping_counter += 1
 
-        # If validation accuracy hasn't improved for patience epochs, increase patience
-        if early_stopping_counter >= patience and epoch >= warmup_epochs:
-            print(f"Early stopping at epoch {epoch}")
+        # # If validation accuracy hasn't improved for patience epochs, increase patience
+        # if early_stopping_counter >= patience and epoch >= warmup_epochs:
+        #     print(f"Early stopping at epoch {epoch}")
 
-            stop_epoch = epoch
-            break
+        #     stop_epoch = epoch
+        #     break
 
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
@@ -205,6 +203,19 @@ if __name__=='__main__':
     print(f'Applying {params.train_aug} Data Augmentation ......')
     print(f'Applying StainNet stain normalization......') if params.sn else print()
     
+    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    if params.train_aug:
+        params.checkpoint_dir += f'_{params.train_aug}'
+    if params.sn:
+        params.checkpoint_dir += '_stainnet'
+    if params.anneal_param != 'none':
+        params.checkpoint_dir += f'_{params.anneal_param}'
+    if not params.method  in ['baseline', 'baseline++']: 
+        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
+
+    if not os.path.isdir(params.checkpoint_dir):
+        os.makedirs(params.checkpoint_dir)
+
     if params.method in ['baseline', 'baseline++'] :
       base_datamgr    = SimpleDataManager(image_size, batch_size = 16)
       base_loader     = base_datamgr.get_data_loader( base_file , aug = params.train_aug, sn = params.sn)
@@ -216,7 +227,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -246,14 +257,17 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
           backbone.ResNet.maml = True
 
           if params.method in ['maml', 'maml_approx']:
-            model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx'), env  = MAMLEnv(), **train_few_shot_params )
+            model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
+
+          elif params.method == 'ppo_maml':
+            model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = params.checkpoint_dir, **train_few_shot_params )
        
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
@@ -297,22 +311,10 @@ if __name__=='__main__':
         else:
           raise ValueError('Unknown method')
 
-
-  
+    
     model = model.cuda()
 
-    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
-    if params.train_aug:
-        params.checkpoint_dir += f'_{params.train_aug}'
-    if params.sn:
-        params.checkpoint_dir += '_stainnet'
-    if params.anneal_param != 'none':
-        params.checkpoint_dir += f'_{params.anneal_param}'
-    if not params.method  in ['baseline', 'baseline++']: 
-        params.checkpoint_dir += '_%dway_%dshot' %( params.train_n_way, params.n_shot)
 
-    if not os.path.isdir(params.checkpoint_dir):
-        os.makedirs(params.checkpoint_dir)
 
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch
@@ -325,7 +327,5 @@ if __name__=='__main__':
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
 
-    
-
-    
-    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
+for train_counter in range(3):
+    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, train_counter, params)
