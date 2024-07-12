@@ -82,7 +82,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
           log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}, Validation Loss: {avg_loss:.4f}\n')
 
         # only save at last training phase
-        if train_counter > 2: 
+        if train_counter > 1: 
 
             if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
                 print("best model! save...")
