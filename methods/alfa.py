@@ -1,6 +1,8 @@
 # This code is modified from https://github.com/dragen1860/MAML-Pytorch and https://github.com/katerakelly/pytorch-maml 
-
+import os
+import torch.optim 
 import backbone
+import utils
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -9,29 +11,41 @@ import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 
-class HyperparameterNetwork(nn.Module):
-    def __init__(self, input_dims, fc1_dims, fc2_dims, output_dims, chkpt_dir):
-        super(HyperparameterNetwork, self).__init__()
-        self.checkpoint_file = os.path.join(chkpt_dir, 'hyperparameters')
+# Define the hyperparameter generator network
+class HyperparameterGenerator(nn.Module):
+    def __init__(self):
+        super(HyperparameterGenerator, self).__init__()
+        # Fixed dimensions for the hidden layers and output
+        self.fc1_dims = 32
+        self.fc2_dims = 32
+        self.output_dims = 2
+
+
+        # Define the network layers
         self.network = nn.Sequential(
-            nn.Linear(input_dims, fc1_dims),
+            nn.Linear(1, self.fc1_dims),  # Placeholder for input dimensions
             nn.ReLU(),
-            nn.Linear(fc1_dims, fc2_dims),
+            nn.Linear(self.fc1_dims, self.fc2_dims),
             nn.ReLU(),
-            nn.Linear(fc2_dims, output_dims),
+            nn.Linear(self.fc2_dims, self.output_dims),
         )
-        self.optimizer = optim.Adam(self.parameters(), lr=1e-3)
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.to(self.device)
 
-    def forward(self, state):
-        return self.network(state)
-
-    def save_checkpoint(self):
-        torch.save(self.state_dict(), self.checkpoint_file)
-
-    def load_checkpoint(self):
-        self.load_state_dict(torch.load(self.checkpoint_file))
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+    
+    def forward(self, gradients, weights):
+        # Compute the layer-wise means
+        device = next(self.parameters()).device
+        grad_means = [torch.mean(g) for g in gradients]
+        weight_means = [torch.mean(w) for w in weights]
+        
+        # Concatenate and pass through the network to get alpha and beta
+        inputs = torch.cat([torch.stack(grad_means), torch.stack(weight_means)], dim=0).unsqueeze(0)
+        
+        # Update input dimension based on the concatenated tensor
+        self.network[0] = nn.Linear(inputs.size(1), self.fc1_dims).to(device)
+        
+        alpha, beta = self.network(inputs).squeeze(0)
+        return alpha, beta
 
 
 
@@ -48,11 +62,8 @@ class MAML(MetaTemplate):
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
 
-        # Calculate input dimensions for the hyperparameter network
-        sample_input = torch.zeros(1, self.feat_dim)
-        task_specific_state_dim = sample_input.numel() * len(list(self.parameters()))
-        
-        self.hyperparameter_net = HyperparameterNetwork(input_dims=task_specific_state_dim, fc1_dims= 32, fc2_dims= 32, output_dims=2, chkpt_dir='./chkpt') 
+       
+        # self.hyperparameter_net = HyperparameterGenerator()
         self.train_lr = 0.01 #this is the inner loop learning rate
         self.reg_lambda = 0.01
 
@@ -67,7 +78,7 @@ class MAML(MetaTemplate):
         scores  = self.classifier.forward(out)
         return scores
 
-    def set_forward(self,x, is_feature = False):
+    def set_forward(self,x, hyperparameter_net, is_feature = False):
         assert is_feature == False, 'MAML do not support fixed feature' 
         
         x = x.cuda()
@@ -81,19 +92,27 @@ class MAML(MetaTemplate):
             weight.fast = None
         self.zero_grad()
 
-        task_specific_state = torch.cat([param.view(-1) for param in self.parameters()]).detach()
+
         for task_step in range(self.task_update_num): 
 
-            hyperparams = self.hyperparameter_net(task_specific_state)
-            train_lr, reg_lambda = hyperparams[0], hyperparams[1]
-            print('Train_lr: ',train_lr)
-            print('Reg_lambda: ',reg_lambda)
+  
             
             scores = self.forward(x_a_i)
             set_loss = self.loss_fn( scores, y_a_i) 
             grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
             if self.approx:
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
+
+            # Extract gradients and weights for the hyperparameter generator
+            gradients = grad
+            weights = list(self.parameters())
+
+            # Use the hyperparameter network to get updated learning rate and regularization
+            train_lr, reg_lambda = hyperparameter_net(gradients, weights)
+            print('Train_lr:', train_lr.item())
+            print('Reg_lambda:', reg_lambda.item())
+
+
             fast_parameters = []
             for k, weight in enumerate(self.parameters()):
                 #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
@@ -112,21 +131,23 @@ class MAML(MetaTemplate):
         raise ValueError('MAML performs further adapation simply by increasing task_upate_num')
 
 
-    def set_forward_loss(self, x):
-        scores = self.set_forward(x, is_feature = False)
+    def set_forward_loss(self, x, hyperparameter_net):
+        scores = self.set_forward(x, hyperparameter_net, is_feature = False)
         y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
         loss = self.loss_fn(scores, y_b_i)
 
         return loss
 
 
-    def train_loop(self, epoch, train_loader, optimizer): #overwrite parrent function
+    def train_loop(self, epoch, train_loader, optimizer, hyperparameter_net): #overwrite parrent function
         print_freq = 10
         avg_loss=0
         task_count = 0
         loss_all = []
 
+
         optimizer.zero_grad()
+        hyperparameter_net.optimizer.zero_grad()
 
         #train
         for i, (x,_) in enumerate(train_loader):
@@ -135,9 +156,10 @@ class MAML(MetaTemplate):
             assert self.n_way  ==  x.size(0), "MAML do not support way change"
             
 
-            loss = self.set_forward_loss(x)
+            loss = self.set_forward_loss(x, hyperparameter_net)
             avg_loss = avg_loss+loss.item()
             loss_all.append(loss)
+
 
             task_count += 1
 
@@ -148,20 +170,34 @@ class MAML(MetaTemplate):
                 loss_q.backward()
                 optimizer.step()
 
-                
-                # Update the hyperparameter network using loss_q gradients
-                self.hyperparameter_net.optimizer.zero_grad()
-                hyperparameter_loss = loss_q.detach()  # Detach loss_q to avoid backprop through MAML
-                hyperparameter_loss.backward()
-                self.hyperparameter_net.optimizer.step()
+
+                hyperparameter_net.optimizer.step()
     
                 task_count = 0
                 loss_all = []
             optimizer.zero_grad()
+            hyperparameter_net.optimizer.zero_grad()
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
+
+    def correct(self, x, hyperparameter_net):       
+        scores = self.set_forward(x, hyperparameter_net)
+        y = torch.from_numpy(np.repeat(range(self.n_way), self.n_query))
+        
+        if hasattr(self, 'loss_type') and self.loss_type == 'mse':
+            y = utils.one_hot(y, self.n_way)
+            
+        y = Variable(y.cuda())
+        loss = self.loss_fn(scores, y)
+
+        y_query = np.repeat(range( self.n_way ), self.n_query )
+
+        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind[:,0] == y_query)
+        return float(top1_correct), len(y_query), loss
                       
-    def test_loop(self, test_loader, return_std = False): #overwrite parrent function
+    def test_loop(self, test_loader, hyperparameter_net, return_std = False): #overwrite parrent function
         correct =0
         count = 0
         avg_loss=0
@@ -172,7 +208,7 @@ class MAML(MetaTemplate):
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way  ==  x.size(0), "MAML do not support way change"
-            correct_this, count_this, loss = self.correct(x)
+            correct_this, count_this, loss = self.correct(x, hyperparameter_net)
             acc_all.append(correct_this/ count_this *100 )
             avg_loss = avg_loss+loss.item()
 
@@ -184,3 +220,6 @@ class MAML(MetaTemplate):
             return acc_mean, acc_std, float(avg_loss/iter_num)
         else:
             return acc_mean, float(avg_loss/iter_num)
+
+
+
