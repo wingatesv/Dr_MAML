@@ -9,6 +9,31 @@ import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 
+class HyperparameterNetwork(nn.Module):
+    def __init__(self, input_dims, fc1_dims, fc2_dims, output_dims, chkpt_dir):
+        super(HyperparameterNetwork, self).__init__()
+        self.checkpoint_file = os.path.join(chkpt_dir, 'hyperparameters')
+        self.network = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, output_dims),
+        )
+        self.optimizer = optim.Adam(self.parameters(), lr=1e-3)
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.to(self.device)
+
+    def forward(self, state):
+        return self.network(state)
+
+    def save_checkpoint(self):
+        torch.save(self.state_dict(), self.checkpoint_file)
+
+    def load_checkpoint(self):
+        self.load_state_dict(torch.load(self.checkpoint_file))
+
+
 
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False):
@@ -22,7 +47,12 @@ class MAML(MetaTemplate):
         self.task_update_num = 5
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
-      
+
+        # Calculate input dimensions for the hyperparameter network
+        sample_input = torch.zeros(1, self.feat_dim)
+        task_specific_state_dim = sample_input.numel() * len(list(self.parameters()))
+        
+        self.hyperparameter_net = HyperparameterNetwork(input_dims=task_specific_state_dim, fc1_dims= 32, fc2_dims= 32, output_dims=2, chkpt_dir='./chkpt') 
         self.train_lr = 0.01 #this is the inner loop learning rate
         self.reg_lambda = 0.01
 
@@ -51,8 +81,14 @@ class MAML(MetaTemplate):
             weight.fast = None
         self.zero_grad()
 
-
+        task_specific_state = torch.cat([param.view(-1) for param in self.parameters()]).detach()
         for task_step in range(self.task_update_num): 
+
+            hyperparams = self.hyperparameter_net(task_specific_state)
+            train_lr, reg_lambda = hyperparams[0], hyperparams[1]
+            print('Train_lr: ',train_lr)
+            print('Reg_lambda: ',reg_lambda)
+            
             scores = self.forward(x_a_i)
             set_loss = self.loss_fn( scores, y_a_i) 
             grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
@@ -111,6 +147,13 @@ class MAML(MetaTemplate):
                 loss_value = loss_q.item()
                 loss_q.backward()
                 optimizer.step()
+
+                
+                # Update the hyperparameter network using loss_q gradients
+                self.hyperparameter_net.optimizer.zero_grad()
+                hyperparameter_loss = loss_q.detach()  # Detach loss_q to avoid backprop through MAML
+                hyperparameter_loss.backward()
+                self.hyperparameter_net.optimizer.step()
     
                 task_count = 0
                 loss_all = []
