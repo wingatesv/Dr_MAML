@@ -23,7 +23,7 @@ from methods.baselinefinetune import BaselineFinetune
 from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
-from methods.maml import MAML, HyperparameterGenerator
+from methods.maml import MAML, Regularizer
 from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
@@ -37,20 +37,22 @@ from methods.ppo_maml import PPO_MAML
 
 def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
     learning_rate = 0.0001
+    regularizer = Regularizer().cuda()
     if optimization == 'Adam':
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
-          optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
+          # optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
+          optimizer = torch.optim.Adam(list(model.parameters()) + list(regularizer.parameters()), lr=learning_rate)
          
     elif optimization == 'Ranger21':
           print(f'With scalar Learning rate, Ranger21 LR:{learning_rate}')
           optimizer = Ranger21(model.parameters(), lr = learning_rate, num_epochs=stop_epoch, num_batches_per_epoch=len(base_loader))   
     else:
        raise ValueError('Unknown optimization, please define by yourself')
-
-    hyperparameter_net = HyperparameterGenerator().cuda()
+  
     max_acc = 0   
     total_training_time = 0
     scheduler = None
+    
     # scheduler = lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=(stop_epoch-start_epoch), eta_min=0.0001)
 
     # Initialize early stopping variables
@@ -68,7 +70,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
         model.train()
-        model.train_loop(epoch, base_loader,  optimizer, hyperparameter_net) #model are called by reference, no need to return 
+        model.train_loop(epoch, base_loader,  optimizer, regularizer) #model are called by reference, no need to return 
         # annealing_rate = model.get_annealing_rate()
 
         model.eval()
@@ -76,7 +78,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         if not os.path.isdir(params.checkpoint_dir):
             os.makedirs(params.checkpoint_dir)
 
-        acc, avg_loss = model.test_loop(val_loader, hyperparameter_net)
+        acc, avg_loss = model.test_loop(val_loader, regularizer)
    
         # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
