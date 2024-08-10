@@ -6,6 +6,7 @@ import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
+import utils
 
 class Regularizer(nn.Module):
     def __init__(self, input_dim=36):
@@ -33,7 +34,26 @@ class MAML(MetaTemplate):
         self.approx = approx  # first order approx.
         self.alfa = alfa  # enable ALFA mechanism
 
-        # self.regularizer = None  # Regularizer will be set externally
+        # Initial learning rate and weight decay
+        self.init_learning_rate = 1e-3  # from the repo's implementation
+        self.init_weight_decay = 5e-4   # from the repo's implementation
+        # Print number of parameters before initializing post-multipliers
+        num_params_before = sum(p.numel() for p in self.parameters())
+        print(f'Number of parameters before initializing post-multipliers: {num_params_before}')
+
+        # Meta-learnable post-multipliers
+        if self.alfa:
+            # Convert the generator to a list to get the number of parameters
+            parameter_list = list(self.parameters())
+            self.alpha_post_multipliers = nn.ParameterList([
+                nn.Parameter(torch.ones(self.task_update_num) * self.init_learning_rate) for _ in range(len(parameter_list))
+            ])
+            self.beta_post_multipliers = nn.ParameterList([
+                nn.Parameter(torch.ones(self.task_update_num) * self.init_weight_decay * self.init_learning_rate) for _ in range(len(parameter_list))
+            ])
+        # Print number of parameters after initializing post-multipliers
+        num_params_after = sum(p.numel() for p in self.parameters())
+        print(f'Number of parameters after initializing post-multipliers: {num_params_after}')
 
     def forward(self, x):
         out = self.feature.forward(x)
@@ -50,7 +70,8 @@ class MAML(MetaTemplate):
         x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:])  # query data
         y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()  # label for support data
 
-        fast_parameters = list(self.parameters())  # the first gradient calculated is based on original weight
+        # fast_parameters = list(self.parameters())  # the first gradient calculated is based on original weight
+        fast_parameters = [param for name, param in self.named_parameters() if "alpha_post_multipliers" not in name and "beta_post_multipliers" not in name]
         for weight in self.parameters():
             weight.fast = None
         self.zero_grad()
@@ -89,18 +110,32 @@ class MAML(MetaTemplate):
                 # print('alpha shape', generated_alpha.shape)
                 # print('beta shape', generated_beta.shape)
 
-   
+            # Assuming generated_alpha and generated_beta are of correct length
+            num_layers = len(fast_parameters)  # This should match the length of post-multipliers
 
+            # Ensure the lengths match
+            assert num_layers == len(self.alpha_post_multipliers), "Mismatch in number of layers and alpha post-multipliers"
+            assert num_layers == len(self.beta_post_multipliers), "Mismatch in number of layers and beta post-multipliers"
+            # Get the relevant parameters for the model layers, excluding alpha and beta post-multipliers
+            relevant_parameters = [
+                param for name, param in self.named_parameters()
+                if "alpha_post_multipliers" not in name and "beta_post_multipliers" not in name
+            ]
             fast_parameters = []
-            for k, weight in enumerate(self.parameters()):
+            for k, weight in enumerate(relevant_parameters):
                 if weight.fast is None:
                     if self.alfa and regularizer is not None:
-                        weight.fast = weight - generated_alpha[k] * grad[k] - generated_beta[k]
+                        # print(f"k={k}, task_step={task_step}, num_layers={num_layers}")
+                        alpha = generated_alpha[k] * self.alpha_post_multipliers[k][task_step]
+                        beta = generated_beta[k] * self.beta_post_multipliers[k][task_step]
+                        weight.fast = weight - alpha * grad[k] - beta
                     else:
                         weight.fast = weight - self.train_lr * grad[k]  # create weight.fast
                 else:
                     if self.alfa and regularizer is not None:
-                        weight.fast = weight.fast - generated_alpha[k] * grad[k] - generated_beta[k]
+                        alpha = generated_alpha[k] * self.alpha_post_multipliers[k][task_step]
+                        beta = generated_beta[k] * self.beta_post_multipliers[k][task_step]
+                        weight.fast = weight.fast - alpha * grad[k] - beta
                     else:
                         weight.fast = weight.fast - self.train_lr * grad[k]  # create an updated weight.fast
 
@@ -152,6 +187,23 @@ class MAML(MetaTemplate):
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / float(i + 1):.6f}')
 
+    def correct(self, x, regularizer):       
+        scores = self.set_forward(x, regularizer=regularizer)
+        y = torch.from_numpy(np.repeat(range(self.n_way), self.n_query))
+        
+        if hasattr(self, 'loss_type') and self.loss_type == 'mse':
+            y = utils.one_hot(y, self.n_way)
+            
+        y = Variable(y.cuda())
+        loss = self.loss_fn(scores, y)
+
+        y_query = np.repeat(range( self.n_way ), self.n_query )
+
+        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind[:,0] == y_query)
+        return float(top1_correct), len(y_query), loss
+
     def test_loop(self, test_loader, regularizer=None, return_std=False):  # overwrite parent function
         correct = 0
         count = 0
@@ -162,7 +214,7 @@ class MAML(MetaTemplate):
         for i, (x, _) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
-            correct_this, count_this, loss = self.correct(x)
+            correct_this, count_this, loss = self.correct(x, regularizer)
             acc_all.append(correct_this / count_this * 100)
             avg_loss += loss.item()
 
