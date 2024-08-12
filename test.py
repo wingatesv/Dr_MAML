@@ -24,6 +24,7 @@ from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
+from methods.alfa import ALFA, Regularizer
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
 from methods.xmaml import XMAML
@@ -108,7 +109,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -120,6 +121,10 @@ if __name__ == '__main__':
      
       elif params.method == 'anil':
         model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
+
+      elif params.method == 'alfa':
+        model = ALFA(  model_dict[params.model], approx = False , **few_shot_params )
+        regularizer = Regularizer().cuda()
 
       elif params.method == 'ppo_maml':
         model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = checkpoint_dir, test_mode = True, **few_shot_params )
@@ -171,8 +176,9 @@ if __name__ == '__main__':
         if modelfile is not None:
             tmp = torch.load(modelfile)
             model.load_state_dict(tmp['state'])
-            if hasattr(model, 'task_lr'):
-                model.task_lr = tmp['task_lr']
+            if params.method == 'alfa':     
+                regularizer.load_state_dict(tmp['regularizer_state'])
+  
 
     split = params.split
     if params.save_iter != -1:
@@ -181,7 +187,7 @@ if __name__ == '__main__':
         split_str = split
 
         
-    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
@@ -276,8 +282,10 @@ if __name__ == '__main__':
         if params.adaptation:
             model.task_update_num = 100 #We perform adaptation on MAML simply by updating more times.
         model.eval()
-        acc_mean, acc_std, avg_loss = model.test_loop( novel_loader, return_std = True)
-
+        if params.method == 'alfa':     
+            acc_mean, acc_std, avg_loss = model.test_loop( novel_loader, regularizer, return_std = True)
+        else:
+            acc_mean, acc_std, avg_loss = model.test_loop( novel_loader, return_std = True)
     else:
         novel_file = os.path.join( checkpoint_dir.replace("checkpoints","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
         cl_data_file = feat_loader.init_loader(novel_file)
