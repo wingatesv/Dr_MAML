@@ -25,6 +25,7 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from methods.anil import ANIL
 from methods.alfa import ALFA, Regularizer
+from methods.reptile import Reptile
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
 from methods.xmaml import XMAML
@@ -109,7 +110,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -121,6 +122,9 @@ if __name__ == '__main__':
      
       elif params.method == 'anil':
         model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
+
+      elif params.method == 'reptile':
+        model = Reptile(  model_dict[params.model], **few_shot_params )
 
       elif params.method == 'alfa':
         model = ALFA(  model_dict[params.model], approx = False , **few_shot_params )
@@ -187,7 +191,7 @@ if __name__ == '__main__':
         split_str = split
 
         
-    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
