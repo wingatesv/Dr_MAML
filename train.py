@@ -101,7 +101,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             if params.method == 'alfa':
                      torch.save({
                     'epoch': epoch, 
-                    'model_state': model.state_dict(),
+                    'state': model.state_dict(),
                     'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
                         }, outfile)
             else:
@@ -128,7 +128,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             if params.method == 'alfa':
                 torch.save({
                     'epoch': epoch, 
-                    'model_state': model.state_dict(),
+                    'state': model.state_dict(),
                     'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
                 }, outfile)
             else:
