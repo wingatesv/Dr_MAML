@@ -8,6 +8,7 @@ from . import maml
 from . import anil
 from . import anneal_maml
 from . import alfa
+from . import reptile
 from . import xmaml
 from . import tra_anil
 from . import ppo_torch
