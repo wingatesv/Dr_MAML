@@ -28,6 +28,7 @@ from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
 from methods.xmaml import XMAML
+from methods.alfa import ALFA, Regularizer
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
@@ -39,7 +40,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     learning_rate = 0.0001
     if optimization == 'Adam':
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
-          optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
+          if params.method == 'alfa':
+               regularizer = Regularizer().cuda()
+               optimizer = torch.optim.Adam(list(model.parameters()) + list(regularizer.parameters()), lr=learning_rate)
+          else:
+              optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
          
     elif optimization == 'Ranger21':
           print(f'With scalar Learning rate, Ranger21 LR:{learning_rate}')
@@ -67,15 +72,21 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
         model.train()
-        model.train_loop(epoch, base_loader,  optimizer) #model are called by reference, no need to return 
-        # annealing_rate = model.get_annealing_rate()
+        
+        if params.method == 'alfa':
+            model.train_loop(epoch, base_loader,  optimizer, regularizer) 
+        else:
+            model.train_loop(epoch, base_loader,  optimizer) 
 
         model.eval()
 
         if not os.path.isdir(params.checkpoint_dir):
             os.makedirs(params.checkpoint_dir)
-
-        acc, avg_loss = model.test_loop(val_loader)
+            
+        if params.method == 'alfa':
+            acc, avg_loss = model.test_loop(val_loader, regularizer)
+        else:
+            acc, avg_loss = model.test_loop(val_loader)
    
         # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
@@ -87,7 +98,14 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             max_acc = acc
             early_stopping_counter = 0
             outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            if params.method == 'alfa':
+                     torch.save({
+                    'epoch': epoch, 
+                    'model_state': model.state_dict(),
+                    'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
+                        }, outfile)
+            else:
+                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
 
         elif acc == -1: #for baseline and baseline++
           pass
@@ -107,7 +125,14 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            if params.method == 'alfa':
+                torch.save({
+                    'epoch': epoch, 
+                    'model_state': model.state_dict(),
+                    'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
+                }, outfile)
+            else:
+                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
 
             
         elapsed_time = time.time() - start_time # calculate elapsed time
@@ -227,7 +252,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -257,7 +282,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -307,6 +332,8 @@ if __name__=='__main__':
                              approx = False, 
                              **train_few_shot_params )
 
+          elif params.method == 'alfa':
+            model = ALFA(  model_dict[params.model], approx = False , **train_few_shot_params )
               
         else:
           raise ValueError('Unknown method')
