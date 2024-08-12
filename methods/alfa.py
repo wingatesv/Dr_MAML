@@ -20,9 +20,9 @@ class Regularizer(nn.Module):
     def forward(self, x):
         return self.network(x)
 
-class MAML(MetaTemplate):
+class ALFA(MetaTemplate):
     def __init__(self, model_func, n_way, n_support, approx=False, alfa=True):
-        super(MAML, self).__init__(model_func, n_way, n_support, change_way=False)
+        super(ALFA, self).__init__(model_func, n_way, n_support, change_way=False)
 
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
@@ -61,7 +61,7 @@ class MAML(MetaTemplate):
         return scores
 
     def set_forward(self, x, regularizer=None, is_feature=False):
-        assert not is_feature, 'MAML does not support fixed feature'
+        assert not is_feature, 'ALFA does not support fixed feature'
         # regularizer = regularizer
 
         x = x.cuda()
@@ -146,7 +146,7 @@ class MAML(MetaTemplate):
         return scores
 
     def set_forward_adaptation(self, x, is_feature=False):  # overwrite parent function
-        raise ValueError('MAML performs further adaptation simply by increasing task_update_num')
+        raise ValueError('ALFA performs further adaptation simply by increasing task_update_num')
 
     def set_forward_loss(self, x, regularizer=None):
         scores = self.set_forward(x, regularizer=regularizer, is_feature=False)
@@ -166,7 +166,7 @@ class MAML(MetaTemplate):
         for i, (x, _) in enumerate(train_loader):
 
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way == x.size(0), "MAML does not support way change"
+            assert self.n_way == x.size(0), "ALFA does not support way change"
 
             loss = self.set_forward_loss(x, regularizer=regularizer)
             avg_loss += loss.item()
@@ -174,7 +174,7 @@ class MAML(MetaTemplate):
 
             task_count += 1
 
-            if task_count == self.n_task:  # MAML update several tasks at one time
+            if task_count == self.n_task:  # ALFA update several tasks at one time
                 loss_q = torch.stack(loss_all).sum(0)
                 loss_value = loss_q.item()
                 loss_q.backward()
@@ -213,7 +213,7 @@ class MAML(MetaTemplate):
         iter_num = len(test_loader)
         for i, (x, _) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way == x.size(0), "MAML does not support way change"
+            assert self.n_way == x.size(0), "ALFA does not support way change"
             correct_this, count_this, loss = self.correct(x, regularizer)
             acc_all.append(correct_this / count_this * 100)
             avg_loss += loss.item()
