@@ -90,7 +90,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
             max_acc = acc
             early_stopping_counter = 0
             outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            torch.save({
+                'epoch': epoch, 
+                'model_state': model.state_dict(),
+                'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
+            }, outfile)
 
         elif acc == -1: #for baseline and baseline++
           pass
@@ -110,7 +114,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            torch.save({
+                    'epoch': epoch, 
+                    'model_state': model.state_dict(),
+                    'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
+                }, outfile)
 
             
         elapsed_time = time.time() - start_time # calculate elapsed time
