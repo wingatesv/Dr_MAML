@@ -9,17 +9,19 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from methods.ppo_torch import Agent
 from gym import spaces
-from methods.trap_step_scheduler import half_trapezoidal_step_scheduler, new_trapezoidal_step_scheduler
+
 import math
 
 class PPO_MAML(MetaTemplate):
     def __init__(self, model_func, n_way, n_support, approx=False,  agent_chkpt_dir = None, test_mode=False):
         super(PPO_MAML, self).__init__(model_func, n_way, n_support, change_way=False)
+        
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         
         self.n_task = 4
+        self.max_task_update_num = 5
         self.task_update_num = 5 if test_mode else 3
         self.train_lr = 0.01
         self.approx = approx
@@ -37,12 +39,23 @@ class PPO_MAML(MetaTemplate):
                            alpha=0.01,
                            batch_size= 5, 
                            fc_dims=64 )
-        self.N = 1
+
         self.n_steps = 0
-        self.score_history = []
+        self.done = False
+        self.num_cycle = 5
         self.learn_iters = 0
+        self.reward_history = []
         self.observation = np.full(self.number_of_observations, -1)
-         
+
+        self.previous_train_loss = 0
+        self.previous_val_loss = 0
+        
+    def reset_environment(self):
+        self.n_steps = 0 
+        self.done = False
+        self.previous_train_loss = self.train_loss
+        self.previous_val_loss = self.val_loss
+        self.reward_history = []
         
     def set_epoch(self, epoch):
         self.current_epoch = epoch
@@ -92,6 +105,7 @@ class PPO_MAML(MetaTemplate):
         print_freq = 10
         avg_loss = 0
         task_count = 0
+        self.grad_norm = 0.0
         loss_all = []
         
 
@@ -126,13 +140,12 @@ class PPO_MAML(MetaTemplate):
                 loss_q.backward()
 
                 # Calculate gradient norm
-                self.grad_norm = 0.0
                 for param in self.parameters():
                     if param.grad is not None:
-                        grad_norm += param.grad.norm().item() ** 2
-                grad_norm = grad_norm ** 0.5  # Take the square root to get the norm
+                        self.grad_norm += param.grad.norm().item() ** 2
+                self.grad_norm = self.grad_norm ** 0.5  # Take the square root to get the norm
     
-                print(f'Epoch {epoch} | Gradient Norm: {grad_norm:.6f}')
+                print(f'Epoch {epoch} | Gradient Norm: {self.grad_norm:.6f}')
                 
                 optimizer.step()
 
@@ -146,12 +159,30 @@ class PPO_MAML(MetaTemplate):
 
         self.train_loss = avg_loss/len(train_loader)
 
-
+    def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
+        # Calculate the efficiency as the reduction in loss per GD step
+        train_efficiency = (previous_train_loss - train_loss) / gd_steps if gd_steps > 0 else 0
+        val_efficiency = (previous_val_loss - val_loss) / gd_steps if gd_steps > 0 else 0
+        
+        # Average efficiency across training and validation
+        efficiency = (train_efficiency + val_efficiency) / 2
+        print('efficiency: ', efficiency)
+        
+        # Penalize for using too many GD steps
+        penalty = gd_steps / max_gd_steps
+        
+        # Final energy-based reward
+        reward = efficiency * (1 - penalty)
+        print('reward: ', reward)
+        
+        # Ensure the reward is non-negative
+        return max(reward, 0)
+    
     def test_loop(self, test_loader, return_std=False):
         correct = 0
         count = 0
         avg_loss = 0
-        done = True
+
         
         acc_all = []
 
@@ -169,16 +200,46 @@ class PPO_MAML(MetaTemplate):
         print(f'{iter_num} Test Acc = {acc_mean:.2f}% ± {1.96 * acc_std / np.sqrt(iter_num):.2f}%, Test Loss = {avg_loss / iter_num:.4f}')
 
         self.val_loss = avg_loss/len(test_loader)
+
+        
         
         if not self.test_mode:
             self.observation = np.array([self.current_epoch, self.train_loss, self.val_loss, self.grad_norm, self.task_update_num])
             print('Observation: ', self.observation)
-            self.agent.remember(self.observation, self.action, self.prob, self.val, reward, done=False)     
+
+            # Calculate the energy-based reward
+            reward = self.calculate_energy_based_reward(
+                self.previous_train_loss, self.train_loss,
+                self.previous_val_loss, self.val_loss,
+                self.task_update_num, self.max_task_update_num
+            )
+            
+            #update previous losses
+            self.previous_train_loss = self.train_loss
+            self.previous_val_loss = self.val_loss
+            reward_history.append(reward)
+
+            # Check for reward worsening or plateau (adaptive episode ending)
+            if len(reward_history) >= int(self.num_cycle/2):
+                if reward < reward_history[-int(self.num_cycle/2)]:  # Reward worsens
+                    self.done = True
+                elif len(reward_history) >= self.num_cycle and np.std(reward_history[-self.num_cycle:]) < 1e-4:  # Improvement plateaus
+                    self.done = True
+            
+            self.agent.remember(self.observation, self.action, self.prob, self.val, reward, self.done)     
          
-            if self.n_steps % self.N == 0:
+            if self.done or (self.n_steps+1) % self.num_cycle  == 0:
                 self.agent.learn(n_epochs = 5)
                 self.learn_iters +=1
                 print('Learn iteration: ', self.learn_iters)
+
+                #reset environment
+                self.reset_environment()
+                
+                if self.done:
+                    print('Episode ended early due to worsening reward or plateau.')
+                else:
+                     print(f'Episode ended at {self.num_cycle} cycle')
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
