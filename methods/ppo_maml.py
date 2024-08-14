@@ -49,6 +49,28 @@ class PPO_MAML(MetaTemplate):
 
         self.previous_train_loss = 0
         self.previous_val_loss = 0
+
+        # Store metrics for plotting
+        self.metrics = {
+            'epochs': [],
+            'train_loss': [],
+            'val_loss': [],
+            'grad_norm': [],
+            'task_update_num': [],
+            'reward': [],
+            'acc_mean': []
+        }
+        
+   
+    def collect_metrics(self, reward, acc_mean):
+        self.metrics['epochs'].append(self.current_epoch)
+        self.metrics['train_loss'].append(self.train_loss)
+        self.metrics['val_loss'].append(self.val_loss)
+        self.metrics['grad_norm'].append(self.grad_norm)
+        self.metrics['task_update_num'].append(self.task_update_num)
+        self.metrics['reward'].append(reward)
+        self.metrics['acc_mean'].append(acc_mean/100)
+        print(f"Metrics collected for epoch {self.current_epoch}.")
         
     def reset_environment(self):
         self.n_steps = 0 
@@ -256,8 +278,61 @@ class PPO_MAML(MetaTemplate):
                     print('Episode ended early due to worsening reward or plateau.')
                 else:
                      print(f'Episode ended at {self.n_steps+1} cycle')
+                    
+            # Collect metrics at the end of each epoch
+            self.collect_metrics(reward, acc_mean)
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
         else:
             return acc_mean, float(avg_loss / iter_num)
+
+    # New method to output metrics and plot graphs
+    def output_metrics(self, file_path=None, save_plots=True, plot_dir='content/'):
+        # Convert the metrics dictionary to a pandas DataFrame
+        metrics_df = pd.DataFrame(self.metrics)
+        
+        if file_path:
+            # Save the DataFrame as a CSV file
+            metrics_df.to_csv(file_path, index=False)
+            print(f"Metrics saved to {file_path}")
+
+        # Plotting
+        plt.rcParams.update({'font.size': 14, 'font.weight': 'bold'})  # Set font size and weight
+
+        # First plot: Train Loss, Validation Loss, and Accuracy
+        plt.figure(figsize=(10, 6))
+        plt.plot(metrics_df['epochs'], metrics_df['train_loss'], label='Train Loss', color='blue', marker='o')
+        plt.plot(metrics_df['epochs'], metrics_df['val_loss'], label='Validation Loss', color='green', marker='^')
+        plt.plot(metrics_df['epochs'], metrics_df['acc_mean'], label='Accuracy', color='orange', marker='s')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss / Accuracy')
+        plt.legend()
+        if save_plots:
+            plt.savefig(f'{plot_dir}train_val_acc_plot.png', bbox_inches='tight')
+        plt.show()
+
+        # Second plot: Gradient Norm
+        plt.figure(figsize=(10, 6))
+        plt.plot(metrics_df['epochs'], metrics_df['grad_norm'], label='Gradient Norm', color='blue', marker='o')
+        plt.xlabel('Epoch')
+        plt.ylabel('Gradient Norm')
+        plt.legend()
+        if save_plots:
+            plt.savefig(f'{plot_dir}grad_norm_plot.png', bbox_inches='tight')
+        plt.show()
+
+        # Third plot: Task Update Number and Reward
+        plt.figure(figsize=(10, 6))
+        plt.plot(metrics_df['epochs'], metrics_df['task_update_num'], label='Task Update Num', color='blue', marker='o')
+        plt.plot(metrics_df['epochs'], metrics_df['reward'], label='Reward', color='green', marker='^')
+        plt.xlabel('Epoch')
+        plt.ylabel('Task Update Num / Reward')
+        plt.legend()
+        if save_plots:
+            plt.savefig(f'{plot_dir}task_update_reward_plot.png', bbox_inches='tight')
+        plt.show()
+
+        # Return the DataFrame for further use if needed
+        return metrics_df
+
