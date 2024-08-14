@@ -37,9 +37,7 @@ class ALFA(MetaTemplate):
         # Initial learning rate and weight decay
         self.init_learning_rate = 1e-3  # from the repo's implementation
         self.init_weight_decay = 5e-4   # from the repo's implementation
-        # Print number of parameters before initializing post-multipliers
-        num_params_before = sum(p.numel() for p in self.parameters())
-        print(f'Number of parameters before initializing post-multipliers: {num_params_before}')
+
 
         # Meta-learnable post-multipliers
         if self.alfa:
@@ -51,9 +49,7 @@ class ALFA(MetaTemplate):
             self.beta_post_multipliers = nn.ParameterList([
                 nn.Parameter(torch.ones(self.task_update_num) * self.init_weight_decay * self.init_learning_rate) for _ in range(len(parameter_list))
             ])
-        # Print number of parameters after initializing post-multipliers
-        num_params_after = sum(p.numel() for p in self.parameters())
-        print(f'Number of parameters after initializing post-multipliers: {num_params_after}')
+      
 
     def forward(self, x):
         out = self.feature.forward(x)
