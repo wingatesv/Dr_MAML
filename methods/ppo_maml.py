@@ -9,6 +9,7 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 from methods.ppo_torch import Agent
 from gym import spaces
+from scipy.stats import linregress
 
 import math
 
@@ -182,37 +183,81 @@ class PPO_MAML(MetaTemplate):
         self.train_loss = avg_loss/len(train_loader)
 
     def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
-      # Calculate the efficiency as the reduction in loss per GD step
-      train_efficiency = (previous_train_loss - train_loss) / gd_steps if gd_steps > 0 else 0
-      val_efficiency = (previous_val_loss - val_loss) / gd_steps if gd_steps > 0 else 0
+        # Initialize histories if not already present
+        if not hasattr(self, 'train_loss_history'):
+            self.train_loss_history = []
+        if not hasattr(self, 'val_loss_history'):
+            self.val_loss_history = []
+            
+        # Track efficiency history for smoothing (assuming these are lists initialized elsewhere)
+        if not hasattr(self, 'train_efficiency_history'):
+            self.train_efficiency_history = []
+        if not hasattr(self, 'val_efficiency_history'):
+            self.val_efficiency_history = []
+            
+        # Append current losses to history
+        self.train_loss_history.append(train_loss)
+        self.val_loss_history.append(val_loss)
+        
+        # Calculate the relative efficiency as the percentage change in loss per GD step
+        train_efficiency = ((previous_train_loss - train_loss) / previous_train_loss) / gd_steps if gd_steps > 0 and previous_train_loss > 0 else 0
+        val_efficiency = ((previous_val_loss - val_loss) / previous_val_loss) / gd_steps if gd_steps > 0 and previous_val_loss > 0 else 0
+        
+        # Apply a diminishing returns adjustment to GD steps
+        adjusted_gd_steps = gd_steps ** 0.5  # Square root to reduce the impact of higher steps
+        
+        # Calculate adjusted efficiencies with diminishing returns factored in
+        train_efficiency_adjusted = (previous_train_loss - train_loss) / adjusted_gd_steps if adjusted_gd_steps > 0 else 0
+        val_efficiency_adjusted = (previous_val_loss - val_loss) / adjusted_gd_steps if adjusted_gd_steps > 0 else 0
+        
+        # Store efficiencies for smoothing
+        self.train_efficiency_history.append(train_efficiency_adjusted)
+        self.val_efficiency_history.append(val_efficiency_adjusted)
+        
+        # Smooth the efficiencies over the last few epochs (e.g., last 3 epochs)
+        smoothed_train_efficiency = np.mean(self.train_efficiency_history[-3:])
+        smoothed_val_efficiency = np.mean(self.val_efficiency_history[-3:])
+        
+        # Dynamically weight the importance of training vs. validation efficiency
+        weight = current_epoch / total_epochs  # Early epochs favor training, later favor validation
+        efficiency = (1 - weight) * smoothed_train_efficiency + weight * smoothed_val_efficiency
+        print('Smoothed Efficiency: ', round(efficiency, 4))
       
-      # Average efficiency across training and validation
-      efficiency = (train_efficiency + val_efficiency) / 2
-      print('Efficiency: ', round(efficiency,4))
-      
-      # Check for loss convergence
-      if (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss > 0):
-          convergence_bonus = 0.2  # Add a bonus for convergence
-          print('Convergence detected, adding bonus.')
-      elif (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss <= 0):
-          convergence_bonus = -0.2  # Penalize for divergence (overfitting potential)
-          print('Divergence detected, applying penalty.')
-      else:
-          convergence_bonus = 0  # No change if no clear convergence or divergence
-          print('No significant convergence or divergence detected.')
-      
-      # Emphasize efficiency over step penalty
-      penalty = gd_steps / (max_gd_steps + 1)
-      weighted_efficiency = 1.5 * efficiency  # Emphasize efficiency more strongly
-      print('Penalty: ', round(penalty, 4))
-      
-      # Final energy-based reward
-      reward = (weighted_efficiency * (1 - penalty)) + convergence_bonus
-      print('Reward: ', round(reward, 4))
-      
-
-      
-      return reward
+        # Loss convergence and trend detection using linear regression over last few epochs
+        trend_window = 5  # Number of epochs to consider for trend detection
+        if len(self.train_loss_history) >= trend_window:
+            train_slope, _, _, _, _ = linregress(range(trend_window), self.train_loss_history[-trend_window:])
+            val_slope, _, _, _, _ = linregress(range(trend_window), self.val_loss_history[-trend_window:])
+            
+            if train_slope < 0 and val_slope < 0:
+                convergence_bonus = 0.2  # Both losses trending downwards
+                print('Convergence trend detected, adding bonus.')
+            elif train_slope < 0 and val_slope >= 0:
+                convergence_bonus = -0.2  # Training loss decreasing but validation loss not, potential overfitting
+                print('Divergence trend detected, applying penalty.')
+            else:
+                convergence_bonus = 0  # No significant trend detected
+                print('No significant trend detected.')
+        else:
+            convergence_bonus = 0  # Not enough data to detect a trend
+            print('Not enough epochs to detect trend, no convergence bonus applied.')
+        
+        # Adaptive penalty based on performance
+        if efficiency > 0.01 and self.grad_norm > 10:  # Good efficiency and high gradient norm suggest not converging yet
+            penalty = (gd_steps / max_gd_steps) ** 2 * 0.5  # Reduced penalty
+        else:
+            penalty = (gd_steps / max_gd_steps) ** 2  # Full penalty if efficiency is low
+        print('Penalty: ', round(penalty, 4))
+        
+        # Exploration bonus, more significant at the beginning of training
+        exploration_bonus = 0.2 * (1 - current_epoch / total_epochs) if gd_steps >= 4 else 0
+        print('Exploration Bonus: ', round(exploration_bonus, 4))
+        
+        # Final energy-based reward
+        reward = (1.5 * efficiency * (1 - penalty)) + convergence_bonus + exploration_bonus
+        print('Reward: ', round(reward, 4))
+        
+        return reward
 
     
     def test_loop(self, test_loader, return_std=False):
@@ -242,7 +287,7 @@ class PPO_MAML(MetaTemplate):
         
         if not self.test_mode:
     
-            self.observation = np.array([self.current_epoch, self.train_loss, self.val_loss, self.grad_norm, self.task_update_num])
+            self.observation = np.array([self.current_epoch, self.train_loss, self.val_loss, self.grad_norm, self.task_update_num, (acc_mean/100)])
             print('Observation: ', self.observation)
 
             # Calculate the energy-based reward
@@ -296,6 +341,9 @@ class PPO_MAML(MetaTemplate):
             # Save the DataFrame as a CSV file
             metrics_df.to_csv(file_path, index=False)
             print(f"Metrics saved to {file_path}")
+            
+        # Calculate cumulative reward
+        metrics_df['cumulative_reward'] = metrics_df['reward'].cumsum()
 
         # Plotting
         plt.rcParams.update({'font.size': 14, 'font.weight': 'bold'})  # Set font size and weight
@@ -321,11 +369,12 @@ class PPO_MAML(MetaTemplate):
         if save_plots:
             plt.savefig(f'{plot_dir}grad_norm_plot.png', bbox_inches='tight')
         plt.show()
-
-        # Third plot: Task Update Number and Reward
+        
+        # Third plot: Task Update Number, Reward, and Cumulative Reward
         plt.figure(figsize=(10, 6))
         plt.plot(metrics_df['epochs'], metrics_df['task_update_num'], label='Task Update Num', color='blue', marker='o')
         plt.plot(metrics_df['epochs'], metrics_df['reward'], label='Reward', color='green', marker='^')
+        plt.plot(metrics_df['epochs'], metrics_df['cumulative_reward'], label='Cumulative Reward', color='orange', marker='s')
         plt.xlabel('Epoch')
         plt.ylabel('Task Update Num / Reward')
         plt.legend()
