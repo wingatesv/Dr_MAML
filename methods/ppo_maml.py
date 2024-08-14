@@ -42,7 +42,7 @@ class PPO_MAML(MetaTemplate):
 
         self.n_steps = 0
         self.done = False
-        self.num_cycle = 5
+        self.num_cycle = 20
         self.learn_iters = 0
         self.reward_history = []
         self.observation = np.full(self.number_of_observations, -1)
@@ -159,24 +159,41 @@ class PPO_MAML(MetaTemplate):
 
         self.train_loss = avg_loss/len(train_loader)
 
-    def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
-        # Calculate the efficiency as the reduction in loss per GD step
-        train_efficiency = (previous_train_loss - train_loss) / gd_steps if gd_steps > 0 else 0
-        val_efficiency = (previous_val_loss - val_loss) / gd_steps if gd_steps > 0 else 0
-        
-        # Average efficiency across training and validation
-        efficiency = (train_efficiency + val_efficiency) / 2
-        print('efficiency: ', efficiency)
-        
-        # Penalize for using too many GD steps
-        penalty = gd_steps / max_gd_steps
-        
-        # Final energy-based reward
-        reward = efficiency * (1 - penalty)
-        print('reward: ', reward)
-        
-        # Ensure the reward is non-negative
-        return max(reward, 0)
+def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
+    # Calculate the efficiency as the reduction in loss per GD step
+    train_efficiency = (previous_train_loss - train_loss) / gd_steps if gd_steps > 0 else 0
+    val_efficiency = (previous_val_loss - val_loss) / gd_steps if gd_steps > 0 else 0
+    
+    # Average efficiency across training and validation
+    efficiency = (train_efficiency + val_efficiency) / 2
+    print('Efficiency: ', efficiency)
+    
+    # Check for loss convergence
+    if (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss > 0):
+        convergence_bonus = 0.2  # Add a bonus for convergence
+        print('Convergence detected, adding bonus.')
+    elif (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss <= 0):
+        convergence_bonus = -0.2  # Penalize for divergence (overfitting potential)
+        print('Divergence detected, applying penalty.')
+    else:
+        convergence_bonus = 0  # No change if no clear convergence or divergence
+        print('No significant convergence or divergence detected.')
+    
+    # Emphasize efficiency over step penalty
+    penalty = gd_steps / (max_gd_steps + 1)
+    weighted_efficiency = 1.5 * efficiency  # Emphasize efficiency more strongly
+    print('Penalty: ', penalty)
+    
+    # Final energy-based reward
+    reward = (weighted_efficiency * (1 - penalty)) + convergence_bonus
+    print('Reward before max check: ', reward)
+    
+    # Ensure the reward is non-negative
+    final_reward = max(reward, 0)
+    print('Final reward: ', final_reward)
+    
+    return final_reward
+
     
     def test_loop(self, test_loader, return_std=False):
         correct = 0
