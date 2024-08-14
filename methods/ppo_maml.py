@@ -56,6 +56,7 @@ class PPO_MAML(MetaTemplate):
         self.previous_train_loss = self.train_loss
         self.previous_val_loss = self.val_loss
         self.reward_history = []
+        self.task_update_num = 3
         
     def set_epoch(self, epoch):
         self.current_epoch = epoch
@@ -121,7 +122,7 @@ class PPO_MAML(MetaTemplate):
             
         print('task_update_num:', self.task_update_num)
         self.n_steps += 1
-            
+        print('Number of Iteration:',  self.n_steps)
 
         optimizer.zero_grad()
         for i, (x, _) in enumerate(train_loader):
@@ -145,7 +146,6 @@ class PPO_MAML(MetaTemplate):
                         self.grad_norm += param.grad.norm().item() ** 2
                 self.grad_norm = self.grad_norm ** 0.5  # Take the square root to get the norm
     
-                print(f'Epoch {epoch} | Gradient Norm: {self.grad_norm:.6f}')
                 
                 optimizer.step()
 
@@ -159,40 +159,38 @@ class PPO_MAML(MetaTemplate):
 
         self.train_loss = avg_loss/len(train_loader)
 
-def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
-    # Calculate the efficiency as the reduction in loss per GD step
-    train_efficiency = (previous_train_loss - train_loss) / gd_steps if gd_steps > 0 else 0
-    val_efficiency = (previous_val_loss - val_loss) / gd_steps if gd_steps > 0 else 0
-    
-    # Average efficiency across training and validation
-    efficiency = (train_efficiency + val_efficiency) / 2
-    print('Efficiency: ', efficiency)
-    
-    # Check for loss convergence
-    if (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss > 0):
-        convergence_bonus = 0.2  # Add a bonus for convergence
-        print('Convergence detected, adding bonus.')
-    elif (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss <= 0):
-        convergence_bonus = -0.2  # Penalize for divergence (overfitting potential)
-        print('Divergence detected, applying penalty.')
-    else:
-        convergence_bonus = 0  # No change if no clear convergence or divergence
-        print('No significant convergence or divergence detected.')
-    
-    # Emphasize efficiency over step penalty
-    penalty = gd_steps / (max_gd_steps + 1)
-    weighted_efficiency = 1.5 * efficiency  # Emphasize efficiency more strongly
-    print('Penalty: ', penalty)
-    
-    # Final energy-based reward
-    reward = (weighted_efficiency * (1 - penalty)) + convergence_bonus
-    print('Reward before max check: ', reward)
-    
-    # Ensure the reward is non-negative
-    final_reward = max(reward, 0)
-    print('Final reward: ', final_reward)
-    
-    return final_reward
+    def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
+      # Calculate the efficiency as the reduction in loss per GD step
+      train_efficiency = (previous_train_loss - train_loss) / gd_steps if gd_steps > 0 else 0
+      val_efficiency = (previous_val_loss - val_loss) / gd_steps if gd_steps > 0 else 0
+      
+      # Average efficiency across training and validation
+      efficiency = (train_efficiency + val_efficiency) / 2
+      print('Efficiency: ', round(efficiency,4))
+      
+      # Check for loss convergence
+      if (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss > 0):
+          convergence_bonus = 0.2  # Add a bonus for convergence
+          print('Convergence detected, adding bonus.')
+      elif (previous_train_loss - train_loss > 0) and (previous_val_loss - val_loss <= 0):
+          convergence_bonus = -0.2  # Penalize for divergence (overfitting potential)
+          print('Divergence detected, applying penalty.')
+      else:
+          convergence_bonus = 0  # No change if no clear convergence or divergence
+          print('No significant convergence or divergence detected.')
+      
+      # Emphasize efficiency over step penalty
+      penalty = gd_steps / (max_gd_steps + 1)
+      weighted_efficiency = 1.5 * efficiency  # Emphasize efficiency more strongly
+      print('Penalty: ', round(penalty, 4))
+      
+      # Final energy-based reward
+      reward = (weighted_efficiency * (1 - penalty)) + convergence_bonus
+      print('Reward: ', round(reward, 4))
+      
+
+      
+      return reward
 
     
     def test_loop(self, test_loader, return_std=False):
@@ -221,6 +219,7 @@ def calculate_energy_based_reward(self, previous_train_loss, train_loss, previou
         
         
         if not self.test_mode:
+    
             self.observation = np.array([self.current_epoch, self.train_loss, self.val_loss, self.grad_norm, self.task_update_num])
             print('Observation: ', self.observation)
 
@@ -234,13 +233,13 @@ def calculate_energy_based_reward(self, previous_train_loss, train_loss, previou
             #update previous losses
             self.previous_train_loss = self.train_loss
             self.previous_val_loss = self.val_loss
-            reward_history.append(reward)
+            self.reward_history.append(reward)
 
             # Check for reward worsening or plateau (adaptive episode ending)
-            if len(reward_history) >= int(self.num_cycle/2):
-                if reward < reward_history[-int(self.num_cycle/2)]:  # Reward worsens
+            if len(self.reward_history) >= int(self.num_cycle/2):
+                if reward < self.reward_history[-int(self.num_cycle/2)]:  # Reward worsens
                     self.done = True
-                elif len(reward_history) >= self.num_cycle and np.std(reward_history[-self.num_cycle:]) < 1e-4:  # Improvement plateaus
+                elif len(self.reward_history) >= self.num_cycle and np.std(self.reward_history[-self.num_cycle:]) < 1e-4:  # Improvement plateaus
                     self.done = True
             
             self.agent.remember(self.observation, self.action, self.prob, self.val, reward, self.done)     
@@ -256,7 +255,7 @@ def calculate_energy_based_reward(self, previous_train_loss, train_loss, previou
                 if self.done:
                     print('Episode ended early due to worsening reward or plateau.')
                 else:
-                     print(f'Episode ended at {self.num_cycle} cycle')
+                     print(f'Episode ended at {self.n_steps+1} cycle')
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
