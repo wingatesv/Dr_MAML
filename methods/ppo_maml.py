@@ -348,39 +348,59 @@ class PPO_MAML(MetaTemplate):
         # Calculate cumulative reward
         metrics_df['cumulative_reward'] = metrics_df['reward'].cumsum()
 
-        # Plotting
-        plt.rcParams.update({'font.size': 14, 'font.weight': 'bold'})  # Set font size and weight
+        # General plot styling settings
+        plt.rcParams.update({
+            'font.size': 14,  # Regular font size for ticks
+            'axes.labelsize': 16,  # Larger font size for axis labels
+            'axes.labelweight': 'bold',  # Bold axis labels
+            'lines.linewidth': 2,  # Thicker lines for better visibility
+            'legend.fontsize': 14,  # Slightly larger legend text
+            'legend.frameon': False,  # No box around legend
+            'axes.spines.top': False,  # Remove top spine for a cleaner look
+            'axes.spines.right': False,  # Remove right spine for a cleaner look
+        })
+
+        # Color scheme for lines
+        color_scheme = {
+            'train_loss': '#1f77b4',  # Light blue
+            'val_loss': '#ff7f0e',    # Light orange
+            'acc_mean': '#2ca02c',    # Light green
+            'grad_norm': '#9467bd',   # Light purple
+            'task_update_num': '#17becf',  # Light cyan
+            'reward': '#e377c2',      # Light pink
+            'cumulative_reward': '#7f7f7f', # Light gray
+        }
 
         # First plot: Train Loss, Validation Loss, and Accuracy
         plt.figure(figsize=(10, 6))
-        plt.plot(metrics_df['epochs'], metrics_df['train_loss'], label='Train Loss', color='blue', marker='o')
-        plt.plot(metrics_df['epochs'], metrics_df['val_loss'], label='Validation Loss', color='green', marker='^')
-        plt.plot(metrics_df['epochs'], metrics_df['acc_mean'], label='Accuracy', color='orange', marker='s')
+        plt.plot(metrics_df['epochs'], metrics_df['train_loss'], label='Train Loss', color=color_scheme['train_loss'])
+        plt.plot(metrics_df['epochs'], metrics_df['val_loss'], label='Validation Loss', color=color_scheme['val_loss'])
+        plt.plot(metrics_df['epochs'], metrics_df['acc_mean'], label='Accuracy', color=color_scheme['acc_mean'])
         plt.xlabel('Epoch')
         plt.ylabel('Loss / Accuracy')
-        plt.legend()
+        plt.legend(loc='best')
         if save_plots:
             plt.savefig(f'{plot_dir}train_val_acc_plot.png', bbox_inches='tight')
         plt.show()
 
         # Second plot: Gradient Norm
         plt.figure(figsize=(10, 6))
-        plt.plot(metrics_df['epochs'], metrics_df['grad_norm'], label='Gradient Norm', color='blue', marker='o')
+        plt.plot(metrics_df['epochs'], metrics_df['grad_norm'], label='Gradient Norm', color=color_scheme['grad_norm'])
         plt.xlabel('Epoch')
         plt.ylabel('Gradient Norm')
-        plt.legend()
+        plt.legend(loc='best')
         if save_plots:
             plt.savefig(f'{plot_dir}grad_norm_plot.png', bbox_inches='tight')
         plt.show()
         
         # Third plot: Task Update Number, Reward, and Cumulative Reward
         plt.figure(figsize=(10, 6))
-        plt.plot(metrics_df['epochs'], metrics_df['task_update_num'], label='Task Update Num', color='blue', marker='o')
-        plt.plot(metrics_df['epochs'], metrics_df['reward'], label='Reward', color='green', marker='^')
-        plt.plot(metrics_df['epochs'], metrics_df['cumulative_reward'], label='Cumulative Reward', color='orange', marker='s')
+        plt.plot(metrics_df['epochs'], metrics_df['task_update_num'], label='Task Update Num', color=color_scheme['task_update_num'])
+        plt.plot(metrics_df['epochs'], metrics_df['reward'], label='Reward', color=color_scheme['reward'])
+        plt.plot(metrics_df['epochs'], metrics_df['cumulative_reward'], label='Cumulative Reward', color=color_scheme['cumulative_reward'])
         plt.xlabel('Epoch')
         plt.ylabel('Task Update Num / Reward')
-        plt.legend()
+        plt.legend(loc='best')
         if save_plots:
             plt.savefig(f'{plot_dir}task_update_reward_plot.png', bbox_inches='tight')
         plt.show()
