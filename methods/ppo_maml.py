@@ -183,6 +183,7 @@ class PPO_MAML(MetaTemplate):
         self.train_loss = avg_loss/len(train_loader)
 
     def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
+        total_epochs = 200
         # Initialize histories if not already present
         if not hasattr(self, 'train_loss_history'):
             self.train_loss_history = []
@@ -219,7 +220,7 @@ class PPO_MAML(MetaTemplate):
         smoothed_val_efficiency = np.mean(self.val_efficiency_history[-3:])
         
         # Dynamically weight the importance of training vs. validation efficiency
-        weight = current_epoch / total_epochs  # Early epochs favor training, later favor validation
+        weight = self.current_epoch / total_epochs  # Early epochs favor training, later favor validation
         efficiency = (1 - weight) * smoothed_train_efficiency + weight * smoothed_val_efficiency
         print('Smoothed Efficiency: ', round(efficiency, 4))
       
@@ -250,7 +251,7 @@ class PPO_MAML(MetaTemplate):
         print('Penalty: ', round(penalty, 4))
         
         # Exploration bonus, more significant at the beginning of training
-        exploration_bonus = 0.2 * (1 - current_epoch / total_epochs) if gd_steps >= 4 else 0
+        exploration_bonus = 0.2 * (1 - self.current_epoch / total_epochs) if gd_steps >= 4 else 0
         print('Exploration Bonus: ', round(exploration_bonus, 4))
         
         # Final energy-based reward
