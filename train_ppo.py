@@ -28,6 +28,8 @@ from methods.anil import ANIL
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
 from methods.xmaml import XMAML
+from methods.alfa import ALFA, Regularizer
+from methods.reptile import Reptile
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
@@ -35,11 +37,15 @@ from methods.ppo_maml import PPO_MAML
 
 
 
-def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, train_counter, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
+def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch, params, patience_ratio=0.1, warmup_epochs_ratio = 0.25):    
     learning_rate = 0.0001
     if optimization == 'Adam':
           print(f'With scalar Learning rate, Adam LR:{learning_rate}')
-          optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
+          if params.method == 'alfa':
+               regularizer = Regularizer().cuda()
+               optimizer = torch.optim.Adam(list(model.parameters()) + list(regularizer.parameters()), lr=learning_rate)
+          else:
+              optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
          
     elif optimization == 'Ranger21':
           print(f'With scalar Learning rate, Ranger21 LR:{learning_rate}')
@@ -67,39 +73,50 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time() # record start time
         model.train()
-        model.train_loop(epoch, base_loader,  optimizer, train_counter) #model are called by reference, no need to return 
-        # annealing_rate = model.get_annealing_rate()
+        
+        if params.method == 'alfa':
+            model.train_loop(epoch, base_loader,  optimizer, regularizer) 
+        else:
+            model.train_loop(epoch, base_loader,  optimizer) 
 
         model.eval()
 
         if not os.path.isdir(params.checkpoint_dir):
             os.makedirs(params.checkpoint_dir)
-
-        acc, avg_loss = model.test_loop(val_loader)
+            
+        if params.method == 'alfa':
+            acc, avg_loss = model.test_loop(val_loader, regularizer)
+        else:
+            acc, avg_loss = model.test_loop(val_loader)
    
         # Save validation accuracy and training time to a text file
         with open(os.path.join(params.checkpoint_dir, 'training_logs.txt'), 'a') as log_file:
           log_file.write(f'Epoch: {epoch}, Validation Accuracy: {acc:.4f}, Validation Loss: {avg_loss:.4f}\n')
 
-        # only save at last training phase
-        if train_counter > 1: 
 
-            if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
-                print("best model! save...")
-                max_acc = acc
-                early_stopping_counter = 0
-                outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
-    
-            elif acc == -1: #for baseline and baseline++
-              pass
-    
+        if acc > max_acc : #for baseline and baseline++, we don't use validation in default and we let acc = -1, but we allow options to validate with DB index
+            print("best model! save...")
+            max_acc = acc
+            early_stopping_counter = 0
+            outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
+            if params.method == 'alfa':
+                     torch.save({
+                    'epoch': epoch, 
+                    'state': model.state_dict(),
+                    'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
+                        }, outfile)
             else:
-              # Skip early stopping check during warm-up period
-              if epoch >= warmup_epochs:
-                   early_stopping_counter += 1
+                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
 
-        # # If validation accuracy hasn't improved for patience epochs, increase patience
+        elif acc == -1: #for baseline and baseline++
+          pass
+
+        else:
+          # Skip early stopping check during warm-up period
+          if epoch >= warmup_epochs:
+               early_stopping_counter += 1
+
+        # If validation accuracy hasn't improved for patience epochs, increase patience
         # if early_stopping_counter >= patience and epoch >= warmup_epochs:
         #     print(f"Early stopping at epoch {epoch}")
 
@@ -109,13 +126,20 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            if params.method == 'alfa':
+                torch.save({
+                    'epoch': epoch, 
+                    'state': model.state_dict(),
+                    'regularizer_state': regularizer.state_dict()  # Save the regularizer's state
+                }, outfile)
+            else:
+                torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
 
             
         elapsed_time = time.time() - start_time # calculate elapsed time
         total_training_time += elapsed_time
       
-        
+    model.output_metrics()
     elapsed_hours = total_training_time / 3600.0 # convert to hours
     print(f"Total Training Time: {elapsed_hours:.2f} h") # print elapsed time for current epoch in hours
 
@@ -229,7 +253,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -259,7 +283,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -270,6 +294,9 @@ if __name__=='__main__':
 
           elif params.method == 'ppo_maml':
             model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = params.checkpoint_dir, **train_few_shot_params )
+
+          elif params.method == 'reptile':
+            model = Reptile(  model_dict[params.model], **train_few_shot_params )
        
           elif params.method == 'anil':
             model = ANIL(  model_dict[params.model], approx = False , **train_few_shot_params )
@@ -309,6 +336,8 @@ if __name__=='__main__':
                              approx = False, 
                              **train_few_shot_params )
 
+          elif params.method == 'alfa':
+            model = ALFA(  model_dict[params.model], approx = False , **train_few_shot_params )
               
         else:
           raise ValueError('Unknown method')
@@ -329,6 +358,5 @@ if __name__=='__main__':
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
 
-    for train_counter in range(3):
-        print('Training phase: ', train_counter)
-        model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, train_counter, params)
+
+    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
