@@ -29,7 +29,7 @@ class PPO_MAML(MetaTemplate):
         self.test_mode = test_mode
         
         self.action_space = spaces.Discrete(3)
-        self.number_of_observations = 5
+        self.number_of_observations = 6
 
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.number_of_observations,), dtype=np.float32)
 
@@ -333,7 +333,7 @@ class PPO_MAML(MetaTemplate):
             return acc_mean, float(avg_loss / iter_num)
 
     # New method to output metrics and plot graphs
-    def output_metrics(self, file_path=None, save_plots=True, plot_dir='content/'):
+    def output_metrics(self, file_path=None, save_plots=True, plot_dir='/content/'):
         # Convert the metrics dictionary to a pandas DataFrame
         metrics_df = pd.DataFrame(self.metrics)
         
