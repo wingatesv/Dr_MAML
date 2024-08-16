@@ -8,22 +8,45 @@ import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from tqdm import tqdm
-
+import pandas as pd
+import matplotlib.pyplot as plt
 
 class MAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, approx = False):
+    def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
         super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
-        
+        self.test_mode  = test_mode
         self.n_task     = 4 #meta-batch, meta update every meta batch
         self.task_update_num = 5
         self.train_lr = 0.01 #this is the inner loop learning rate
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
+        self.grad_norm = 0
+        self.train_loss = 0
+        self.val_loss = 0
+        self.current_epoch = 0
+         # Store metrics for plotting
+        self.metrics = {
+            'epochs': [],
+            'train_loss': [],
+            'val_loss': [],
+            'grad_norm': [],
+            'acc_mean': []
+        }
+        
+    def set_epoch(self, epoch):
+        self.current_epoch = epoch
 
+    def collect_metrics(self, acc_mean):
+        self.metrics['epochs'].append(self.current_epoch)
+        self.metrics['train_loss'].append(self.train_loss)
+        self.metrics['val_loss'].append(self.val_loss)
+        self.metrics['grad_norm'].append(self.grad_norm)
+        self.metrics['acc_mean'].append(acc_mean/100)
+        print(f"Metrics collected for epoch {self.current_epoch}.")
 
 
     def forward(self,x):
@@ -83,7 +106,7 @@ class MAML(MetaTemplate):
         avg_loss=0
         task_count = 0
         loss_all = []
-
+        self.set_epoch(epoch)
         optimizer.zero_grad()
 
         #train
@@ -104,6 +127,13 @@ class MAML(MetaTemplate):
                 loss_q = torch.stack(loss_all).sum(0)
                 loss_value = loss_q.item()
                 loss_q.backward()
+
+                # Calculate gradient norm
+                for param in self.parameters():
+                    if param.grad is not None:
+                        self.grad_norm += param.grad.norm().item() ** 2
+                self.grad_norm = self.grad_norm ** 0.5  # Take the square root to get the norm
+
                 optimizer.step()
     
                 task_count = 0
@@ -111,7 +141,8 @@ class MAML(MetaTemplate):
             optimizer.zero_grad()
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
-                      
+            self.train_loss = avg_loss/len(train_loader)
+
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
         count = 0
@@ -130,8 +161,71 @@ class MAML(MetaTemplate):
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
+
+        if not self.test_mode:
+          self.val_loss = avg_loss/len(test_loader)
+          self.collect_metrics(acc_mean)
+
         print('%d Test Acc = %4.2f%% ± %4.2f%%, Test Loss = %4.4f' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num), float(avg_loss/iter_num)))
         if return_std:
             return acc_mean, acc_std, float(avg_loss/iter_num)
         else:
             return acc_mean, float(avg_loss/iter_num)
+
+
+    # New method to output metrics and plot graphs
+    def output_metrics(self, file_path=None, save_plots=True, plot_dir='/content/'):
+        # Convert the metrics dictionary to a pandas DataFrame
+        metrics_df = pd.DataFrame(self.metrics)
+        
+        if file_path:
+            # Save the DataFrame as a CSV file
+            metrics_df.to_csv(file_path, index=False)
+            print(f"Metrics saved to {file_path}")
+            
+       
+        # General plot styling settings
+        plt.rcParams.update({
+            'font.size': 14,  # Regular font size for ticks
+            'axes.labelsize': 16,  # Larger font size for axis labels
+            'axes.labelweight': 'bold',  # Bold axis labels
+            'lines.linewidth': 2,  # Thicker lines for better visibility
+            'legend.fontsize': 14,  # Slightly larger legend text
+            'legend.frameon': False,  # No box around legend
+            'axes.spines.top': False,  # Remove top spine for a cleaner look
+            'axes.spines.right': False,  # Remove right spine for a cleaner look
+        })
+
+        # Color scheme for lines
+        color_scheme = {
+            'train_loss': '#1f77b4',  # Light blue
+            'val_loss': '#ff7f0e',    # Light orange
+            'acc_mean': '#2ca02c',    # Light green
+            'grad_norm': '#9467bd',   # Light purple
+        }
+
+        # First plot: Train Loss, Validation Loss, and Accuracy
+        plt.figure(figsize=(10, 6))
+        plt.plot(metrics_df['epochs'], metrics_df['train_loss'], label='Train Loss', color=color_scheme['train_loss'])
+        plt.plot(metrics_df['epochs'], metrics_df['val_loss'], label='Validation Loss', color=color_scheme['val_loss'])
+        plt.plot(metrics_df['epochs'], metrics_df['acc_mean'], label='Accuracy', color=color_scheme['acc_mean'])
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss / Accuracy')
+        plt.legend(loc='best')
+        if save_plots:
+            plt.savefig(f'{plot_dir}train_val_acc_plot.png', bbox_inches='tight')
+        plt.show()
+
+        # Second plot: Gradient Norm
+        plt.figure(figsize=(10, 6))
+        plt.plot(metrics_df['epochs'], metrics_df['grad_norm'], label='Gradient Norm', color=color_scheme['grad_norm'])
+        plt.xlabel('Epoch')
+        plt.ylabel('Gradient Norm')
+        plt.legend(loc='best')
+        if save_plots:
+            plt.savefig(f'{plot_dir}grad_norm_plot.png', bbox_inches='tight')
+        plt.show()
+        
+
+        # Return the DataFrame for further use if needed
+        return metrics_df
