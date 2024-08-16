@@ -118,7 +118,7 @@ if __name__ == '__main__':
       backbone.ResNet.maml = True
 
       if params.method in ['maml', 'maml_approx']:
-        model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **few_shot_params )
+        model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx'), test_mode = True , **few_shot_params )
      
       elif params.method == 'anil':
         model = ANIL(  model_dict[params.model], approx = False , **few_shot_params )
