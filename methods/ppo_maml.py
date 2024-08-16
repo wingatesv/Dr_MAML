@@ -319,13 +319,13 @@ class PPO_MAML(MetaTemplate):
                 self.learn_iters +=1
                 print('Learn iteration: ', self.learn_iters)
 
-                #reset environment
-                self.reset_environment()
-                
                 if self.done:
                     print('Episode ended early due to worsening reward or plateau.')
                 else:
                      print(f'Episode ended at {self.n_steps+1} cycle')
+
+                #reset environment
+                self.reset_environment()
                     
             # Collect metrics at the end of each epoch
             self.collect_metrics(reward, acc_mean)
