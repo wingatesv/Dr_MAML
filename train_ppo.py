@@ -139,7 +139,7 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         elapsed_time = time.time() - start_time # calculate elapsed time
         total_training_time += elapsed_time
       
-    model.output_metrics()
+    model.output_metrics(plot_dir = params.checkpoint_dir)
     elapsed_hours = total_training_time / 3600.0 # convert to hours
     print(f"Total Training Time: {elapsed_hours:.2f} h") # print elapsed time for current epoch in hours
 
