@@ -12,7 +12,6 @@ from gym import spaces
 from scipy.stats import linregress
 import pandas as pd
 import matplotlib.pyplot as plt
-
 import math
 
 class PPO_MAML(MetaTemplate):
@@ -25,12 +24,12 @@ class PPO_MAML(MetaTemplate):
         
         self.n_task = 4
         self.max_task_update_num = 5
-        self.task_update_num = 5 if test_mode else 3
+
         self.train_lr = 0.01
         self.approx = approx
         self.test_mode = test_mode
         
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(2)
         self.number_of_observations = 3
 
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(self.number_of_observations,), dtype=np.float32)
@@ -41,42 +40,39 @@ class PPO_MAML(MetaTemplate):
                            chkpt_dir = agent_chkpt_dir,
                            alpha=0.01,
                            batch_size= 5, 
-                           fc_dims=64 )
+                           fc_dims=32 )
       
 
         self.n_steps = 0
+        self.task_update_num = 0
         self.done = False
-        self.num_cycle = 20
+
         self.learn_iters = 0
         self.reward_history = []
         self.observation = np.full(self.number_of_observations, -1)
 
-        self.previous_support_loss = 0
-        self.previous_query_loss = 0
 
         # Store metrics for plotting
-        self.metrics = {
+    #     self.metrics = {
   
-            'average_support_loss': [],
-            'query_loss': [],
-            'task_update_num': [],
-            'reward': [],
-        }
+    #         'average_support_loss': [],
+    #         'query_loss': [],
+    #         'task_update_num': [],
+    #         'reward': [],
+    #     }
         
    
-    def collect_metrics(self, reward, acc_mean):
-        self.metrics['average_support_loss'].append(self.average_support_loss)
-        self.metrics['query_loss'].append(self.query_loss)
-        self.metrics['task_update_num'].append(self.task_update_num)
-        self.metrics['reward'].append(reward)
-        print(f"Metrics collected for epoch {self.current_epoch}.")
+    # def collect_metrics(self, reward, acc_mean):
+    #     self.metrics['average_support_loss'].append(self.average_support_loss)
+    #     self.metrics['query_loss'].append(self.query_loss)
+    #     self.metrics['task_update_num'].append(self.task_update_num)
+    #     self.metrics['reward'].append(reward)
+    #     print(f"Metrics collected for epoch {self.current_epoch}.")
         
     def reset_environment(self):
         self.n_steps = 0 
+        self.task_update_num = 0
         self.done = False
-        self.previous_train_loss = self.average_support_loss
-        self.previous_val_loss = self.query_loss
-        self.reward_history = []
 
         
     def set_epoch(self, epoch):
@@ -99,16 +95,50 @@ class PPO_MAML(MetaTemplate):
         for weight in self.parameters():
             weight.fast = None
         self.zero_grad()
-      
-        grad_norms = 0
-        support_losses = 0
-        for task_step in range(self.task_update_num):
+
+
+        
+        while self.task_update_num < self.max_task_update_num:
+            # Forward pass on support set
             scores = self.forward(x_a_i)
             set_loss = self.loss_fn(scores, y_a_i)
-            support_losses += set_loss.item()
+            self.support_loss = set_loss.item()
+            
+            # Compute gradients with respect to fast parameters
             grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
             if self.approx:
                 grad = [g.detach() for g in grad]
+            
+            # Compute gradient norm
+            grad_norm = torch.norm(torch.stack([torch.norm(g) for g in grad]))
+            self.grad_norm = grad_norm.item()
+            
+            # Create observation vector for the PPO agent
+            self.observation = np.array([self.support_loss, self.grad_norm, self.task_update_num])
+            print('Observation: ', self.observation)
+    
+            # PPO agent decides whether to continue adaptation or stop
+            self.action, self.prob, self.val = self.agent.choose_action(self.observation)
+            print('PPO Action:', self.action)
+            self.n_steps += 1
+            print('Number of Iteration:', self.n_steps)
+
+            if not self.test_mode:
+                # Calculate reward (example: negative support loss to maximize improvement)
+                reward = -self.support_loss  # Reward could also include other components
+                self.reward_history.append(reward)
+            
+                # Determine if the episode is done
+                self.done = (self.action == 0) or (self.n_steps + 1 >= max_steps)
+                
+                # Store the experience in the PPO agent's memory
+                self.agent.remember(self.observation, self.action, self.prob, self.val, reward, self.done)
+            
+            # If PPO agent decides to stop, break the loop
+            if self.action == 0:  # Action '0' means stop adaptation
+                break
+            
+            # Perform the adaptation step
             fast_parameters = []
             for k, weight in enumerate(self.parameters()):
                 if weight.fast is None:
@@ -116,10 +146,23 @@ class PPO_MAML(MetaTemplate):
                 else:
                     weight.fast = weight.fast - self.train_lr * grad[k]
                 fast_parameters.append(weight.fast)
-
+            
+           
+            self.task_update_num += 1
+            
       
-        self.average_support_loss = support_losses/self.task_update_num
+        print('Total adaptation step:',self.task_update_num)
         scores = self.forward(x_b_i)
+        # Learn from the episode if it has ended
+        if self.done and not self.test_mode:
+            self.agent.learn(n_epochs=5)
+            self.learn_iters +=1
+            print('Learn iteration: ', self.learn_iters)
+            # Collect metrics at the end of each epoch
+            # self.collect_metrics(reward)
+            #reset environment
+            self.reset_environment()
+            
         return scores
 
     def set_forward_loss(self, x):
@@ -134,81 +177,28 @@ class PPO_MAML(MetaTemplate):
         avg_loss = 0
         task_count = 0
         loss_all = []
-        
 
-        self.set_epoch(epoch)
-        
-          
         optimizer.zero_grad()
         for i, (x, _) in enumerate(train_loader):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way == x.size(0), "MAML does not support way change"
-          
-            self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-
-            self.task_update_num = self.action + 1
-              
-            print('task_update_num:', self.task_update_num)
-            self.n_steps += 1
-            print('Number of Iteration:',  self.n_steps)
-        
+ 
             loss = self.set_forward_loss(x)
             avg_loss += loss.item()
             loss_all.append(loss)
-          
-            self.observation = np.array([self.average_support_loss, self.query_loss,  self.task_update_num])
-            print('Observation: ', self.observation)
 
-            # Calculate the energy-based reward
-            reward = self.calculate_reward()
-            
-            #update previous losses
-            self.previous_support_loss = self.average_support_loss
-            self.previous_query_loss = self.query_loss
-            self.reward_history.append(reward)
-
-            # Check for reward worsening or plateau (adaptive episode ending)
-            if len(self.reward_history) >= int(self.num_cycle/2):
-                if reward < self.reward_history[-int(self.num_cycle/2)]:  # Reward worsens
-                    self.done = True
-                elif len(self.reward_history) >= self.num_cycle and np.std(self.reward_history[-self.num_cycle:]) < 1e-4:  # Improvement plateaus
-                    self.done = True
-            
-            self.agent.remember(self.observation, self.action, self.prob, self.val, reward, self.done)     
-         
-            if self.done or (self.n_steps+1) % self.num_cycle  == 0:
-                self.agent.learn(n_epochs = 5)
-                self.learn_iters +=1
-                print('Learn iteration: ', self.learn_iters)
-
-                if self.done:
-                    print('Episode ended early due to worsening reward or plateau.')
-                else:
-                     print(f'Episode ended at {self.n_steps+1} cycle')
-
-                #reset environment
-                self.reset_environment()
-                    
-            # Collect metrics at the end of each epoch
-            self.collect_metrics(reward, acc_mean)
             task_count += 1
             if task_count == self.n_task:
                 loss_q = torch.stack(loss_all).sum(0)
                 loss_value = loss_q.item()
                 loss_q.backward()
-
-                # Calculate gradient norm
-                for param in self.parameters():
-                    if param.grad is not None:
-                        self.grad_norm += param.grad.norm().item() ** 2
-                self.grad_norm = self.grad_norm ** 0.5  # Take the square root to get the norm
-    
-                
                 optimizer.step()
 
                 task_count = 0
                 loss_all = []
             optimizer.zero_grad()
+        
+            
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / float(i + 1):.6f}')
 
@@ -216,82 +206,8 @@ class PPO_MAML(MetaTemplate):
 
 
 
-    def calculate_energy_based_reward(self, previous_train_loss, train_loss, previous_val_loss, val_loss, gd_steps, max_gd_steps):
-        total_epochs = 200
-        # Initialize histories if not already present
-        if not hasattr(self, 'train_loss_history'):
-            self.train_loss_history = []
-        if not hasattr(self, 'val_loss_history'):
-            self.val_loss_history = []
-            
-        # Track efficiency history for smoothing (assuming these are lists initialized elsewhere)
-        if not hasattr(self, 'train_efficiency_history'):
-            self.train_efficiency_history = []
-        if not hasattr(self, 'val_efficiency_history'):
-            self.val_efficiency_history = []
-            
-        # Append current losses to history
-        self.train_loss_history.append(train_loss)
-        self.val_loss_history.append(val_loss)
-        
-        # Calculate the relative efficiency as the percentage change in loss per GD step
-        train_efficiency = ((previous_train_loss - train_loss) / previous_train_loss) / gd_steps if gd_steps > 0 and previous_train_loss > 0 else 0
-        val_efficiency = ((previous_val_loss - val_loss) / previous_val_loss) / gd_steps if gd_steps > 0 and previous_val_loss > 0 else 0
-        
-        # Apply a diminishing returns adjustment to GD steps
-        adjusted_gd_steps = gd_steps ** 0.5  # Square root to reduce the impact of higher steps
-        
-        # Calculate adjusted efficiencies with diminishing returns factored in
-        train_efficiency_adjusted = (previous_train_loss - train_loss) / adjusted_gd_steps if adjusted_gd_steps > 0 else 0
-        val_efficiency_adjusted = (previous_val_loss - val_loss) / adjusted_gd_steps if adjusted_gd_steps > 0 else 0
-        
-        # Store efficiencies for smoothing
-        self.train_efficiency_history.append(train_efficiency_adjusted)
-        self.val_efficiency_history.append(val_efficiency_adjusted)
-        
-        # Smooth the efficiencies over the last few epochs (e.g., last 3 epochs)
-        smoothed_train_efficiency = np.mean(self.train_efficiency_history[-3:])
-        smoothed_val_efficiency = np.mean(self.val_efficiency_history[-3:])
-        
-        # Dynamically weight the importance of training vs. validation efficiency
-        weight = self.current_epoch / total_epochs  # Early epochs favor training, later favor validation
-        efficiency = (1 - weight) * smoothed_train_efficiency + weight * smoothed_val_efficiency
-        print('Smoothed Efficiency: ', round(efficiency, 4))
-      
-        # Loss convergence and trend detection using linear regression over last few epochs
-        trend_window = 5  # Number of epochs to consider for trend detection
-        if len(self.train_loss_history) >= trend_window:
-            train_slope, _, _, _, _ = linregress(range(trend_window), self.train_loss_history[-trend_window:])
-            val_slope, _, _, _, _ = linregress(range(trend_window), self.val_loss_history[-trend_window:])
-            
-            if train_slope < 0 and val_slope < 0:
-                convergence_bonus = 0.2  # Both losses trending downwards
-                print('Convergence trend detected, adding bonus.')
-            elif train_slope < 0 and val_slope >= 0:
-                convergence_bonus = -0.2  # Training loss decreasing but validation loss not, potential overfitting
-                print('Divergence trend detected, applying penalty.')
-            else:
-                convergence_bonus = 0  # No significant trend detected
-                print('No significant trend detected.')
-        else:
-            convergence_bonus = 0  # Not enough data to detect a trend
-            print('Not enough epochs to detect trend, no convergence bonus applied.')
-        
-        # Adaptive penalty based on performance
-        if efficiency > 0.01 and self.grad_norm > 10:  # Good efficiency and high gradient norm suggest not converging yet
-            penalty = (gd_steps / max_gd_steps) ** 2 * 0.5  # Reduced penalty
-        else:
-            penalty = (gd_steps / max_gd_steps) ** 2  # Full penalty if efficiency is low
-        print('Penalty: ', round(penalty, 4))
-        
-        # Exploration bonus, more significant at the beginning of training
-        exploration_bonus = 0.2 * (1 - self.current_epoch / total_epochs) if gd_steps >= 4 else 0
-        print('Exploration Bonus: ', round(exploration_bonus, 4))
-        
-        # Final energy-based reward
-        reward = (1.5 * efficiency * (1 - penalty)) + convergence_bonus + exploration_bonus
-        print('Reward: ', round(reward, 4))
-        
+    def calculate_reward(self):
+        reward = 0
         return reward
 
     
@@ -300,7 +216,6 @@ class PPO_MAML(MetaTemplate):
         count = 0
         avg_loss = 0
 
-        
         acc_all = []
 
         iter_num = len(test_loader)
@@ -316,10 +231,6 @@ class PPO_MAML(MetaTemplate):
         acc_std = np.std(acc_all)
         print(f'{iter_num} Test Acc = {acc_mean:.2f}% ± {1.96 * acc_std / np.sqrt(iter_num):.2f}%, Test Loss = {avg_loss / iter_num:.4f}')
 
-        self.val_loss = avg_loss/len(test_loader)
-
-        
-        if not self.test_mode:
         
         if return_std:
             return acc_mean, acc_std, float(avg_loss / iter_num)
