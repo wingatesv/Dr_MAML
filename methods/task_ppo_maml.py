@@ -46,7 +46,7 @@ class PPO_MAML(MetaTemplate):
         self.n_steps = 0
         self.task_update_num = 0
         self.done = False
-
+        self.task_update_num_list = []
         self.learn_iters = 0
         self.reward_history = []
         self.observation = np.full(self.number_of_observations, -1)
@@ -84,86 +84,124 @@ class PPO_MAML(MetaTemplate):
         return scores
 
     def set_forward(self, x, is_feature=False):
-        assert not is_feature, 'MAML does not support fixed feature'
-        x = x.cuda()
-        x_var = Variable(x)
-        x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:]) 
-        x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:]) 
-        y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()
-        
-        fast_parameters = list(self.parameters())
-        for weight in self.parameters():
-            weight.fast = None
-        self.zero_grad()
+      assert not is_feature, 'MAML does not support fixed feature'
+      x = x.cuda()
+      x_var = Variable(x)
+      x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:]) 
+      x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:]) 
+      y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()
+      y_b_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_query))).cuda()
+      fast_parameters = list(self.parameters())
+      for weight in self.parameters():
+          weight.fast = None
+      self.zero_grad()
 
-
-        
-        while self.task_update_num < self.max_task_update_num:
-            # Forward pass on support set
-            scores = self.forward(x_a_i)
-            set_loss = self.loss_fn(scores, y_a_i)
-            self.support_loss = set_loss.item()
-            
-            # Compute gradients with respect to fast parameters
-            grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
-            if self.approx:
-                grad = [g.detach() for g in grad]
-            
-            # Compute gradient norm
-            grad_norm = torch.norm(torch.stack([torch.norm(g) for g in grad]))
-            self.grad_norm = grad_norm.item()
-            
-            # Create observation vector for the PPO agent
-            self.observation = np.array([self.support_loss, self.grad_norm, self.task_update_num])
-            print('Observation: ', self.observation)
-    
-            # PPO agent decides whether to continue adaptation or stop
-            self.action, self.prob, self.val = self.agent.choose_action(self.observation)
-            print('PPO Action:', self.action)
-            self.n_steps += 1
-            print('Number of Iteration:', self.n_steps)
-
-            if not self.test_mode:
-                # Calculate reward (example: negative support loss to maximize improvement)
-                reward = -self.support_loss  # Reward could also include other components
-                self.reward_history.append(reward)
-            
-                # Determine if the episode is done
-                self.done = (self.action == 0) or (self.n_steps + 1 >= max_steps)
-                
-                # Store the experience in the PPO agent's memory
-                self.agent.remember(self.observation, self.action, self.prob, self.val, reward, self.done)
-            
-            # If PPO agent decides to stop, break the loop
-            if self.action == 0:  # Action '0' means stop adaptation
-                break
-            
-            # Perform the adaptation step
-            fast_parameters = []
-            for k, weight in enumerate(self.parameters()):
-                if weight.fast is None:
-                    weight.fast = weight - self.train_lr * grad[k]
-                else:
-                    weight.fast = weight.fast - self.train_lr * grad[k]
-                fast_parameters.append(weight.fast)
-            
-           
-            self.task_update_num += 1
-            
+      # Perform the first adaptation step before PPO makes decisions
+      scores = self.forward(x_a_i)
+      set_loss = self.loss_fn(scores, y_a_i)
+      self.support_loss = set_loss.item()
       
-        print('Total adaptation step:',self.task_update_num)
-        scores = self.forward(x_b_i)
-        # Learn from the episode if it has ended
-        if self.done and not self.test_mode:
-            self.agent.learn(n_epochs=5)
-            self.learn_iters +=1
-            print('Learn iteration: ', self.learn_iters)
-            # Collect metrics at the end of each epoch
-            # self.collect_metrics(reward)
-            #reset environment
-            self.reset_environment()
-            
-        return scores
+      # Compute gradients with respect to fast parameters
+      grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
+      if self.approx:
+          grad = [g.detach() for g in grad]
+      
+      # Perform the first adaptation step
+      fast_parameters = []
+      for k, weight in enumerate(self.parameters()):
+          if weight.fast is None:
+              weight.fast = weight - self.train_lr * grad[k]
+          else:
+              weight.fast = weight.fast - self.train_lr * grad[k]
+          fast_parameters.append(weight.fast)
+      
+      # Increment the task update counter
+      self.task_update_num = 1
+      self.n_steps = 1
+
+      # Track the previous query set loss to calculate reward
+      previous_query_loss = None
+      
+      while self.task_update_num < self.max_task_update_num:
+          # Forward pass on support set again after the first adaptation step
+          scores = self.forward(x_a_i)
+          set_loss = self.loss_fn(scores, y_a_i)
+          self.support_loss = set_loss.item()
+          
+          # Compute gradients with respect to fast parameters
+          grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
+          if self.approx:
+              grad = [g.detach() for g in grad]
+          
+          # Compute gradient norm
+          grad_norm = torch.norm(torch.stack([torch.norm(g) for g in grad]))
+          self.grad_norm = grad_norm.item()
+          
+          # Create observation vector for the PPO agent
+          self.observation = np.array([self.support_loss, self.grad_norm, self.task_update_num])
+      
+          # PPO agent decides whether to continue adaptation or stop
+          self.action, self.prob, self.val = self.agent.choose_action(self.observation)
+          self.n_steps += 1
+
+          # Forward pass on the query set to evaluate current model performance
+          query_scores = self.forward(x_b_i)
+          query_loss = self.loss_fn(query_scores, y_b_i).item()
+
+          if previous_query_loss is not None:
+              # Calculate the change in query loss
+              loss_improvement = previous_query_loss - query_loss
+              
+              # Determine the reward based on improvement
+              if loss_improvement > 0.01:  # Significant improvement threshold
+                  reward = loss_improvement  # Positive reward for improvement
+              else:
+                  reward = -abs(loss_improvement)  # Negative reward for no or negative improvement
+          else:
+              reward = 0  # No reward for the first step as we don't have a previous query loss
+          
+          previous_query_loss = query_loss
+
+          if not self.test_mode:
+              self.reward_history.append(reward)
+          
+              # Determine if the episode is done
+              self.done = (self.action == 0) or (self.n_steps + 1 >= self.max_task_update_num)
+              
+              # Store the experience in the PPO agent's memory
+              self.agent.remember(self.observation, self.action, self.prob, self.val, reward, self.done)
+          
+          # If PPO agent decides to stop, break the loop
+          if self.action == 0:  # Action '0' means stop adaptation
+              break
+          
+          # Perform the adaptation step
+          fast_parameters = []
+          for k, weight in enumerate(self.parameters()):
+              if weight.fast is None:
+                  weight.fast = weight - self.train_lr * grad[k]
+              else:
+                  weight.fast = weight.fast - self.train_lr * grad[k]
+              fast_parameters.append(weight.fast)
+          
+          self.task_update_num += 1
+      
+      # Print total adaptation steps
+      self.task_update_num_list.append(self.task_update_num)
+      
+      # Final forward pass on query set after adaptation
+      scores = self.forward(x_b_i)
+      
+      # Learn from the episode if it has ended
+      if self.done and not self.test_mode:
+          self.agent.learn(n_epochs=5)
+          self.learn_iters += 1
+          
+          # Reset environment for the next episode
+          self.reset_environment()
+          
+      return scores
+
 
     def set_forward_loss(self, x):
         scores = self.set_forward(x, is_feature=False)
@@ -201,8 +239,10 @@ class PPO_MAML(MetaTemplate):
             
             if i % print_freq == 0:
                 print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / float(i + 1):.6f}')
-
+        
         print(f'Epoch {epoch} | Batch {len(train_loader)}/{len(train_loader)} | Avg Loss {(avg_loss / len(train_loader)):.6f}')
+        print('Average task update num: ', np.mean(self.task_update_num_list))
+        self.task_update_num_list = []
 
 
 
