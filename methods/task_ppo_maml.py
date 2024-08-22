@@ -50,7 +50,8 @@ class PPO_MAML(MetaTemplate):
         self.learn_iters = 0
         self.reward_history = []
         self.observation = np.full(self.number_of_observations, -1)
-
+        self.support_efficiency_history = []
+        self.query_efficiency_history = []
 
         # Store metrics for plotting
     #     self.metrics = {
@@ -90,16 +91,18 @@ class PPO_MAML(MetaTemplate):
       x_a_i = x_var[:, :self.n_support, :, :, :].contiguous().view(self.n_way * self.n_support, *x.size()[2:]) 
       x_b_i = x_var[:, self.n_support:, :, :, :].contiguous().view(self.n_way * self.n_query, *x.size()[2:]) 
       y_a_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_support))).cuda()
-      y_b_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_query))).cuda()
+      if not self.test_mode:
+          y_b_i = Variable(torch.from_numpy(np.repeat(range(self.n_way), self.n_query))).cuda()
+          
       fast_parameters = list(self.parameters())
       for weight in self.parameters():
           weight.fast = None
       self.zero_grad()
-
+        
       # Perform the first adaptation step before PPO makes decisions
       scores = self.forward(x_a_i)
       set_loss = self.loss_fn(scores, y_a_i)
-      self.support_loss = set_loss.item()
+      previous_support_loss = set_loss.item()
       
       # Compute gradients with respect to fast parameters
       grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
@@ -117,16 +120,18 @@ class PPO_MAML(MetaTemplate):
       
       # Increment the task update counter
       self.task_update_num = 1
-      self.n_steps = 1
 
-      # Track the previous query set loss to calculate reward
-      previous_query_loss = None
+      if not self.test_mode:
+          query_scores = self.forward(x_b_i)
+          previous_query_loss = self.loss_fn(query_scores, y_b_i).item()
+
+     
       
       while self.task_update_num < self.max_task_update_num:
           # Forward pass on support set again after the first adaptation step
           scores = self.forward(x_a_i)
           set_loss = self.loss_fn(scores, y_a_i)
-          self.support_loss = set_loss.item()
+          support_loss = set_loss.item()
           
           # Compute gradients with respect to fast parameters
           grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True)
@@ -143,26 +148,19 @@ class PPO_MAML(MetaTemplate):
           # PPO agent decides whether to continue adaptation or stop
           self.action, self.prob, self.val = self.agent.choose_action(self.observation)
           self.n_steps += 1
-
-          # Forward pass on the query set to evaluate current model performance
-          query_scores = self.forward(x_b_i)
-          query_loss = self.loss_fn(query_scores, y_b_i).item()
-
-          if previous_query_loss is not None:
-              # Calculate the change in query loss
-              loss_improvement = previous_query_loss - query_loss
-              
-              # Determine the reward based on improvement
-              if loss_improvement > 0.01:  # Significant improvement threshold
-                  reward = loss_improvement  # Positive reward for improvement
-              else:
-                  reward = -abs(loss_improvement)  # Negative reward for no or negative improvement
-          else:
-              reward = 0  # No reward for the first step as we don't have a previous query loss
           
-          previous_query_loss = query_loss
-
           if not self.test_mode:
+              # Forward pass on the query set to evaluate current model performance
+              query_scores = self.forward(x_b_i)
+              query_loss = self.loss_fn(query_scores, y_b_i).item()
+
+              reward = self.calculate_reward(previous_support_loss, support_loss, previous_query_loss, query_loss, self.task_update_num)
+    
+             
+              #update the previous loss
+              previous_support_loss = support_loss
+              previous_query_loss = query_loss
+
               self.reward_history.append(reward)
           
               # Determine if the episode is done
@@ -209,13 +207,13 @@ class PPO_MAML(MetaTemplate):
         loss = self.loss_fn(scores, y_b_i)
         self.query_loss = loss.item()
         return loss
-
+    
     def train_loop(self, epoch, train_loader, optimizer):
         print_freq = 10
         avg_loss = 0
         task_count = 0
         loss_all = []
-
+        self.set_epoch(epoch)
         optimizer.zero_grad()
         for i, (x, _) in enumerate(train_loader):
             self.n_query = x.size(1) - self.n_support
@@ -246,8 +244,35 @@ class PPO_MAML(MetaTemplate):
 
 
 
-    def calculate_reward(self):
-        reward = 0
+    def calculate_reward(self, previous_support_loss, support_loss, previous_query_loss, query_loss, task_update_num):
+        total_epochs = 200
+        # Calculate the relative efficiency as the percentage change in loss per GD step
+        support_efficiency = ((previous_support_loss - support_loss) / previous_support_loss) / task_update_num if task_update_num > 0 and previous_support_loss > 0 else 0
+        query_efficiency = ((previous_query_loss - query_loss) / previous_query_loss) / task_update_num if task_update_num > 0 and previous_query_loss > 0 else 0
+        
+        # Store efficiencies for smoothing
+        self.support_efficiency_history.append(support_efficiency)
+        self.query_efficiency_history.append(query_efficiency)
+        
+        # Smooth the efficiencies over the last few epochs (e.g., last 3 epochs)
+        smoothed_support_efficiency = np.mean(self.support_efficiency_history[-4:])
+        smoothed_query_efficiency = np.mean(self.query_efficiency_history[-4:])
+        
+        # Dynamically weight the importance of training vs. validation efficiency
+        weight = self.current_epoch / total_epochs  # Early epochs favor training, later favor validation
+        efficiency = (1 - weight) * smoothed_support_efficiency + weight * smoothed_query_efficiency
+        # print('Smoothed Efficiency: ', round(efficiency, 4))
+
+        # Adaptive penalty based on performance
+        if efficiency > 0.01 and self.grad_norm > 10:  # Good efficiency and high gradient norm suggest not converging yet
+            penalty = (task_update_num / self.max_task_update_num) ** 2 * 0.5  # Reduced penalty
+        else:
+            penalty = (task_update_num / self.max_task_update_num) ** 2  # Full penalty if efficiency is low
+        # print('Penalty: ', round(penalty, 4))
+        # Final energy-based reward
+        reward = (1.5 * efficiency * (1 - penalty)) 
+        # print('Reward: ', round(reward, 4))
+        
         return reward
 
     
