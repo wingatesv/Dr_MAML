@@ -143,7 +143,7 @@ class PPO_MAML(MetaTemplate):
           self.grad_norm = grad_norm.item()
           
           # Create observation vector for the PPO agent
-          self.observation = np.array([self.support_loss, self.grad_norm, self.task_update_num])
+          self.observation = np.array([support_loss, self.grad_norm, self.task_update_num])
       
           # PPO agent decides whether to continue adaptation or stop
           self.action, self.prob, self.val = self.agent.choose_action(self.observation)
