@@ -10,6 +10,7 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
+import utils
 
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
@@ -99,12 +100,12 @@ class MAML(MetaTemplate):
 
 
     def set_forward_loss(self, x):
-        scores, avg_support_gradients = self.set_forward(x, is_feature = False)
+        scores, avg_support_gradients, avg_support_loss = self.set_forward(x, is_feature = False)
         y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
         loss = self.loss_fn(scores, y_b_i)
 
         # Calculate query gradients
-        query_gradients = torch.autograd.grad(loss, self.parameters())
+        query_gradients = torch.autograd.grad(loss, self.parameters(), create_graph=True)
 
         # Cosine similarity calculation
         cos_sim = 0
@@ -115,8 +116,10 @@ class MAML(MetaTemplate):
         # Positive gradient filtration
         final_gradients = []
         if cos_sim >= 0:
-            return (loss + avg_support_loss)
+            print('positive gradients')
+            return (loss+avg_support_loss)
         else:
+            print('negative gradients')
             return avg_support_loss
 
 
@@ -161,6 +164,19 @@ class MAML(MetaTemplate):
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
             self.train_loss = avg_loss/len(train_loader)
+    
+    def correct(self, x):       
+        scores, _, _ = self.set_forward(x)
+        y = torch.from_numpy(np.repeat(range(self.n_way), self.n_query)) 
+        y = Variable(y.cuda())
+        loss = self.loss_fn(scores, y)
+
+        y_query = np.repeat(range( self.n_way ), self.n_query )
+
+        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind[:,0] == y_query)
+        return float(top1_correct), len(y_query), loss
 
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
