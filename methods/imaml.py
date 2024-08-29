@@ -87,29 +87,35 @@ class MAML(MetaTemplate):
 
         # feed forward query data
         scores = self.forward(x_b_i)
-        return scores, set_loss, fast_parameters
+        return scores, torch.nn.utils.parameters_to_vector(grad), fast_parameters
 
     def set_forward_adaptation(self,x, is_feature = False): #overwrite parrent function
         raise ValueError('MAML performs further adapation simply by increasing task_upate_num')
 
     def conjugate_gradient(self, in_grad, outer_grad, params):
-          x = torch.nn.utils.parameters_to_vector(outer_grad).detach()
-          r = x - self.hv_prod(in_grad, x, params)
-          p = r.clone()
-          for _ in range(self.cg_steps):
-              Ap = self.hv_prod(in_grad, p, params)
-              alpha = (r @ r) / (p @ Ap)
-              x = x + alpha * p
-              r_new = r - alpha * Ap
-              beta = (r_new @ r_new) / (r @ r)
-              p = r_new + beta * p
-              r = r_new
-          return self.vec_to_grad(x)
+        x = outer_grad.clone().detach()
+        print(f'in_grad shape: {[g.shape for g in in_grad]}')
+        print(f'outer_grad shape: {[g.shape for g in outer_grad]}')
+        print(f'x shape: {x.shape}')
+        r = outer_grad.clone().detach() - self.hv_prod(in_grad, x, params)
+        p = r.clone().detach()
+        for i in range(self.n_cg):
+            Ap = self.hv_prod(in_grad, p, params)
+            alpha = (r @ r)/(p @ Ap)
+            x = x + alpha * p
+            r_new = r - alpha * Ap
+            beta = (r_new @ r_new)/(r @ r)
+            p = r_new + beta * p
+            r = r_new.clone().detach()
+        return self.vec_to_grad(x)
 
+    @torch.enable_grad()
     def hv_prod(self, in_grad, x, params):
-        hv = torch.autograd.grad(in_grad, params, grad_outputs=x, retain_graph=True)
+    
+        hv = torch.autograd.grad(in_grad, params, retain_graph=True, grad_outputs=x)
         hv = torch.nn.utils.parameters_to_vector(hv).detach()
-        return hv / self.lamb + x
+        # precondition with identity matrix
+        return hv/self.lamb + x
 
     def vec_to_grad(self, vec):
         pointer = 0
@@ -121,13 +127,14 @@ class MAML(MetaTemplate):
         return res
 
     def set_forward_loss(self, x):
-        scores, in_loss, fast_parameters = self.set_forward(x, is_feature = False)
+        scores, in_grad, fast_parameters = self.set_forward(x, is_feature = False)
         y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
         loss = self.loss_fn(scores, y_b_i)
 
-        # Compute implicit gradient
-        outer_grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
-        in_grad = torch.autograd.grad(in_loss, fast_parameters, create_graph=True)
+       
+        outer_grad = torch.nn.utils.parameters_to_vector(torch.autograd.grad(loss, fast_parameters))
+
+        # in_grad = torch.autograd.grad(in_loss, fast_parameters, create_graph=False)
         implicit_grad = self.conjugate_gradient(in_grad, outer_grad, fast_parameters)
 
         return loss, implicit_grad
