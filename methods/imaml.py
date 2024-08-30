@@ -10,6 +10,7 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
+import utils
 
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
@@ -28,6 +29,9 @@ class MAML(MetaTemplate):
         self.train_loss = 0
         self.val_loss = 0
         self.current_epoch = 0
+
+        self.lamb = 0.5
+        self.n_cg = 5
          # Store metrics for plotting
         self.metrics = {
             'epochs': [],
@@ -83,8 +87,11 @@ class MAML(MetaTemplate):
                 else:
                     weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                 fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
-
-
+        
+        if not self.test_mode:
+          sup_scores = self.forward(x_a_i)
+          set_loss = self.loss_fn( sup_scores, y_a_i) 
+          grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
         # feed forward query data
         scores = self.forward(x_b_i)
         return scores, torch.nn.utils.parameters_to_vector(grad), fast_parameters
@@ -94,9 +101,7 @@ class MAML(MetaTemplate):
 
     def conjugate_gradient(self, in_grad, outer_grad, params):
         x = outer_grad.clone().detach()
-        print(f'in_grad shape: {[g.shape for g in in_grad]}')
-        print(f'outer_grad shape: {[g.shape for g in outer_grad]}')
-        print(f'x shape: {x.shape}')
+
         r = outer_grad.clone().detach() - self.hv_prod(in_grad, x, params)
         p = r.clone().detach()
         for i in range(self.n_cg):
@@ -113,7 +118,8 @@ class MAML(MetaTemplate):
     def hv_prod(self, in_grad, x, params):
     
         hv = torch.autograd.grad(in_grad, params, retain_graph=True, grad_outputs=x)
-        hv = torch.nn.utils.parameters_to_vector(hv).detach()
+        hv_contiguous = [h.contiguous() for h in hv]
+        hv = torch.nn.utils.parameters_to_vector(hv_contiguous).detach()
         # precondition with identity matrix
         return hv/self.lamb + x
 
@@ -145,6 +151,7 @@ class MAML(MetaTemplate):
         avg_loss=0
         task_count = 0
         loss_all = []
+        self.test_mode = False
         self.set_epoch(epoch)
         optimizer.zero_grad()
         grad_list = [] 
@@ -186,12 +193,30 @@ class MAML(MetaTemplate):
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
             self.train_loss = avg_loss/len(train_loader)
+    
+    def correct(self, x):       
+        scores, _, _ = self.set_forward(x)
+        y = torch.from_numpy(np.repeat(range(self.n_way), self.n_query))
+        
+        if hasattr(self, 'loss_type') and self.loss_type == 'mse':
+            y = utils.one_hot(y, self.n_way)
+            
+        y = Variable(y.cuda())
+        loss = self.loss_fn(scores, y)
+
+        y_query = np.repeat(range( self.n_way ), self.n_query )
+
+        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind[:,0] == y_query)
+        return float(top1_correct), len(y_query), loss
 
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
         count = 0
         avg_loss=0
         acc_all = []
+        self.test_mode = True
         
         iter_num = len(test_loader) 
         # for i, (x,_) in enumerate(test_loader):
