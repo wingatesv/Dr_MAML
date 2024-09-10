@@ -25,6 +25,8 @@ class MAML(MetaTemplate):
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
         self.grad_norm = 0
+        self.train_confidence = 0
+        self.train_entropy = 0
         self.train_loss = 0
         self.val_loss = 0
         self.current_epoch = 0
@@ -34,7 +36,9 @@ class MAML(MetaTemplate):
             'train_loss': [],
             'val_loss': [],
             'grad_norm': [],
-            'acc_mean': []
+            'acc_mean': [],
+            'confidence': [],
+            'entropy': [],
         }
         
     def set_epoch(self, epoch):
@@ -45,6 +49,8 @@ class MAML(MetaTemplate):
         self.metrics['train_loss'].append(self.train_loss)
         self.metrics['val_loss'].append(self.val_loss)
         self.metrics['grad_norm'].append(self.grad_norm)
+        self.metrics['confidence'].append(self.train_confidence)
+        self.metrics['entropy'].append(self.train_entropy)
         self.metrics['acc_mean'].append(acc_mean/100)
         print(f"Metrics collected for epoch {self.current_epoch}.")
 
@@ -98,7 +104,7 @@ class MAML(MetaTemplate):
         y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
         loss = self.loss_fn(scores, y_b_i)
 
-        return loss
+        return loss, scores
 
 
     def train_loop(self, epoch, train_loader, optimizer): #overwrite parrent function
@@ -109,6 +115,9 @@ class MAML(MetaTemplate):
         self.set_epoch(epoch)
         optimizer.zero_grad()
 
+        all_confidences = []
+        all_entropies = []
+
         #train
         for i, (x,_) in enumerate(train_loader):
 
@@ -116,9 +125,20 @@ class MAML(MetaTemplate):
             assert self.n_way  ==  x.size(0), "MAML do not support way change"
             
 
-            loss = self.set_forward_loss(x)
+            loss, scores = self.set_forward_loss(x)
             avg_loss = avg_loss+loss.item()
             loss_all.append(loss)
+
+            # Compute softmax probabilities
+            probs = F.softmax(scores, dim=1)
+            
+            # Compute confidence as max probability for each query
+            confidence = probs.max(dim=1)[0].mean().item()
+            all_confidences.append(confidence)
+            
+            # Compute entropy for each query
+            entropy = -(probs * (probs + 1e-8).log()).sum(dim=1).mean().item()
+            all_entropies.append(entropy)
 
             task_count += 1
 
@@ -142,6 +162,8 @@ class MAML(MetaTemplate):
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
             self.train_loss = avg_loss/len(train_loader)
+            self.train_confidence = sum(all_confidences) / len(all_confidences)
+            self.train_entropy = sum(all_entropies) / len(all_entropies)
 
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
@@ -202,6 +224,8 @@ class MAML(MetaTemplate):
             'val_loss': '#ff7f0e',    # Light orange
             'acc_mean': '#2ca02c',    # Light green
             'grad_norm': '#9467bd',   # Light purple
+            'confidence': '#1f77b4',  # Light blue
+             'entropy': '#2ca02c',    # Light green
         }
 
         # First plot: Train Loss, Validation Loss, and Accuracy
@@ -214,6 +238,18 @@ class MAML(MetaTemplate):
         plt.legend(loc='best')
         if save_plots:
             plt.savefig(f'{plot_dir}train_val_acc_plot.png', bbox_inches='tight')
+        plt.show()
+
+        # Second plot: Confidnece, ENtropy and Accuracy
+        plt.figure(figsize=(10, 6))
+        plt.plot(metrics_df['epochs'], metrics_df['confidence'], label='Train Confidence', color=color_scheme['confidence'])
+        plt.plot(metrics_df['epochs'], metrics_df['entropy'], label='Train Entropy', color=color_scheme['entropy'])
+        plt.plot(metrics_df['epochs'], metrics_df['acc_mean'], label='Accuracy', color=color_scheme['acc_mean'])
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss / Accuracy')
+        plt.legend(loc='best')
+        if save_plots:
+            plt.savefig(f'{plot_dir}train_confidence_entropy_acc_plot.png', bbox_inches='tight')
         plt.show()
 
         # Second plot: Gradient Norm
