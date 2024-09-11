@@ -225,7 +225,7 @@ class MAML(MetaTemplate):
             'acc_mean': '#2ca02c',    # Light green
             'grad_norm': '#9467bd',   # Light purple
             'confidence': '#1f77b4',  # Light blue
-             'entropy': '#2ca02c',    # Light green
+             'entropy': '#9467bd',    # Light green
         }
 
         # First plot: Train Loss, Validation Loss, and Accuracy
