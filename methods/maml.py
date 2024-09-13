@@ -117,6 +117,7 @@ class MAML(MetaTemplate):
 
         all_confidences = []
         all_entropies = []
+        grad_norms = []
 
         #train
         for i, (x,_) in enumerate(train_loader):
@@ -148,11 +149,13 @@ class MAML(MetaTemplate):
                 loss_value = loss_q.item()
                 loss_q.backward()
 
+                grad_norm = 0
                 # Calculate gradient norm
                 for param in self.parameters():
                     if param.grad is not None:
-                        self.grad_norm += param.grad.norm().item() ** 2
-                self.grad_norm = self.grad_norm ** 0.5  # Take the square root to get the norm
+                        grad_norm += param.grad.norm().item() ** 2
+                grad_norm = grad_norm ** 0.5  # Take the square root to get the norm
+                grad_norms.append(grad_norm)
 
                 optimizer.step()
     
@@ -164,6 +167,7 @@ class MAML(MetaTemplate):
             self.train_loss = avg_loss/len(train_loader)
             self.train_confidence = sum(all_confidences) / len(all_confidences)
             self.train_entropy = sum(all_entropies) / len(all_entropies)
+            self.grad_norm = sum(grad_norms) / len(grad_norms)
 
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
