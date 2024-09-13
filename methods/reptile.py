@@ -18,11 +18,12 @@ class Reptile(MetaTemplate):
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
-        self.optimizer =  torch.optim.Adam(self.parameters(), lr = 0.0001, betas=(0, 0.999))
+        # self.optimizer =  torch.optim.Adam(self.parameters(), lr = 0.0001, betas=(0, 0.999))
         
         self.n_task  = 4 #meta-batch, meta update every meta batch
         self.task_update_num = 5
-        self.meta_step_size = 0.1
+        self.meta_step_size = 0.001
+        self.inner_lr = 0.01
         self.test = False
 
 
@@ -48,11 +49,11 @@ class Reptile(MetaTemplate):
 
           
             loss = self.loss_fn( scores, y_a_i) 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            grads = torch.autograd.grad(loss, self.parameters(), create_graph=False)
+            with torch.no_grad():
+                for param, grad in zip(self.parameters(), grads):
+                    param -= self.inner_lr * grad
                                   
-            self.optimizer.zero_grad()
         
         if not self.test:
             return deepcopy(self.state_dict()), loss  
