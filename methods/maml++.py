@@ -11,25 +11,38 @@ from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
 
-class MAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
-        super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
-
+class MAML_plus_plus(MetaTemplate):
+    def __init__(self, model_func,  n_way, n_support, test_mode = False, total_epochs=200, approx_until_epoch=50):
+        super(MAML_plus_plus, self).__init__( model_func,  n_way, n_support, change_way = False)
+        self.task_update_num = 5
+        # Initialize ConvNet_bnwb
+        self.feature = backbone.ConvNet_bnwb(
+            depth=4,
+            flatten=True,
+            num_steps=self.task_update_num + 1,
+            maml=True
+        )
         self.loss_fn = nn.CrossEntropyLoss()
+        self.feat_dim = self.feature.final_feat_dim
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         self.test_mode  = test_mode
         self.n_task     = 4 #meta-batch, meta update every meta batch
-        self.task_update_num = 5
+        
         self.train_lr = 0.01 #this is the inner loop learning rate
-        self.approx = approx #first order approx.    
-        self.inner_loop_steps_list  = []  
+        self.approx = True #first order approx.    
+        self.approx_until_epoch = approx_until_epoch
+        self.current_epoch = 0
+        self.total_epochs = total_epochs
+
+    
         self.grad_norm = 0
         self.train_confidence = 0
         self.train_entropy = 0
         self.train_loss = 0
         self.val_loss = 0
-        self.current_epoch = 0
+
+        
          # Store metrics for plotting
         self.metrics = {
             'epochs': [],
@@ -43,6 +56,11 @@ class MAML(MetaTemplate):
         
     def set_epoch(self, epoch):
         self.current_epoch = epoch
+        # Update approx flag based on current epoch
+        if self.current_epoch >= self.approx_until_epoch:
+            self.approx = False  # Switch to second-order gradients
+        else:
+            self.approx = True
 
     def collect_metrics(self, acc_mean):
         self.metrics['epochs'].append(self.current_epoch)
@@ -55,11 +73,22 @@ class MAML(MetaTemplate):
         print(f"Metrics collected for epoch {self.current_epoch}.")
 
 
-    def forward(self,x):
-        out  = self.feature.forward(x)
+    def forward(self,x, step=None):
+        out  = self.feature.forward(x, step=step)
         scores  = self.classifier.forward(out)
         return scores
-
+    
+    def compute_loss_weights(self):
+        t = self.current_epoch / self.total_epochs  # Normalized epoch (0 to 1)
+        # Start with equal weights
+        weights = np.ones(self.task_update_num) / self.task_update_num
+        # Define weights focusing more on later steps as training progresses
+        weights_last_step = np.zeros(self.task_update_num)
+        weights_last_step[-1] = 1.0
+        # Linearly interpolate between equal weights and final step focus
+        weights = (1 - t) * weights + t * weights_last_step
+        return weights
+        
     def set_forward(self,x, is_feature = False):
         assert is_feature == False, 'MAML do not support fixed feature' 
         
@@ -68,19 +97,23 @@ class MAML(MetaTemplate):
         x_a_i = x_var[:,:self.n_support,:,:,:].contiguous().view( self.n_way* self.n_support, *x.size()[2:]) #support data 
         x_b_i = x_var[:,self.n_support:,:,:,:].contiguous().view( self.n_way* self.n_query,   *x.size()[2:]) #query data
         y_a_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_support ) )).cuda() #label for support data
+        y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
         
         fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
         for weight in self.parameters():
             weight.fast = None
         self.zero_grad()
 
+        total_loss = 0
+        v_i = self.compute_loss_weights()
+        v_i = torch.tensor(v_i, dtype=torch.float32).cuda()
 
         for task_step in range(self.task_update_num): 
-            scores = self.forward(x_a_i)
+            scores = self.forward(x_a_i, step=task_step)
             set_loss = self.loss_fn( scores, y_a_i) 
-            grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
-            if self.approx:
-                grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
+            create_graph_flag = not self.approx
+            grad = torch.autograd.grad(set_loss, fast_parameters, create_graph=create_graph_flag)
+
             fast_parameters = []
             for k, weight in enumerate(self.parameters()):
                 #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
@@ -91,20 +124,24 @@ class MAML(MetaTemplate):
                 fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
 
 
-        # feed forward query data
-        scores = self.forward(x_b_i)
-        return scores
+            # feed forward query data
+            scores_query = self.forward(x_b_i, step=task_step+1)
+            query_loss = self.loss_fn(scores_query, y_b_i)
+            total_loss += v_i[task_step] * query_loss
+
+        if not self.test_mode:
+            return total_loss, scores_query
+        else:
+            return scores_query
+  
 
     def set_forward_adaptation(self,x, is_feature = False): #overwrite parrent function
         raise ValueError('MAML performs further adapation simply by increasing task_upate_num')
 
 
     def set_forward_loss(self, x):
-        scores = self.set_forward(x, is_feature = False)
-        y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
-        loss = self.loss_fn(scores, y_b_i)
-
-        return loss, scores
+        total_loss, scores_query = self.set_forward(x, is_feature = False)
+        return total_loss, scores_query
 
 
     def train_loop(self, epoch, train_loader, optimizer): #overwrite parrent function
@@ -112,6 +149,7 @@ class MAML(MetaTemplate):
         avg_loss=0
         task_count = 0
         loss_all = []
+        self.test_mode = False
         self.set_epoch(epoch)
         optimizer.zero_grad()
 
@@ -138,7 +176,9 @@ class MAML(MetaTemplate):
             all_confidences.append(confidence)
             
             # Compute entropy for each query
-            entropy = -(probs * (probs + 1e-8).log()).sum(dim=1).mean().item()
+            epsilon = 1e-8
+            probs = torch.clamp(probs, min=epsilon, max=1.0)
+            entropy = -(probs * probs.log()).sum(dim=1).mean().item()
             all_entropies.append(entropy)
 
             task_count += 1
@@ -164,15 +204,16 @@ class MAML(MetaTemplate):
             optimizer.zero_grad()
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
-            self.train_loss = avg_loss/len(train_loader)
-            self.train_confidence = sum(all_confidences) / len(all_confidences)
-            self.train_entropy = sum(all_entropies) / len(all_entropies)
-            self.grad_norm = sum(grad_norms) / len(grad_norms)
+        self.train_loss = avg_loss/len(train_loader)
+        self.train_confidence = sum(all_confidences) / len(all_confidences)
+        self.train_entropy = sum(all_entropies) / len(all_entropies)
+        self.grad_norm = sum(grad_norms) / len(grad_norms)
 
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
         count = 0
         avg_loss=0
+        self.test_mode = True
         acc_all = []
         
         iter_num = len(test_loader) 
@@ -244,7 +285,7 @@ class MAML(MetaTemplate):
             plt.savefig(f'{plot_dir}train_val_acc_plot.png', bbox_inches='tight')
         plt.show()
 
-        # Second plot: Confidnece, ENtropy and Accuracy
+        # Second plot: confidence, entropy and Accuracy
         plt.figure(figsize=(10, 6))
         plt.plot(metrics_df['epochs'], metrics_df['confidence'], label='Train Confidence', color=color_scheme['confidence'])
         plt.plot(metrics_df['epochs'], metrics_df['entropy'], label='Train Entropy', color=color_scheme['entropy'])
