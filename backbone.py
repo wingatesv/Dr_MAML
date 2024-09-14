@@ -446,6 +446,56 @@ class BatchNorm2d_fw_bnrs(nn.BatchNorm2d):
     
         return out
 
+class BatchNorm2d_fw_bnwb(nn.BatchNorm2d):
+    def __init__(self, num_features, num_steps):
+        super(BatchNorm2d_fw_bnwb, self).__init__(num_features, affine=False, track_running_stats=False)
+        self.num_features = num_features
+        self.num_steps = num_steps
+
+        # Initialize per-step weights and biases
+        self.weights = nn.ParameterList([nn.Parameter(torch.ones(num_features)) for _ in range(num_steps)])
+        self.biases = nn.ParameterList([nn.Parameter(torch.zeros(num_features)) for _ in range(num_steps)])
+
+        # Fast weights for inner-loop updates
+        self.weights_fast = [None] * num_steps
+        self.biases_fast = [None] * num_steps
+
+        # Initialize per-step running statistics
+        self.running_means = [torch.zeros(num_features) for _ in range(num_steps)]
+        self.running_vars = [torch.ones(num_features) for _ in range(num_steps)]
+
+    def forward(self, x, step):
+        if self.weights_fast[step] is not None and self.biases_fast[step] is not None:
+            weight = self.weights_fast[step]
+            bias = self.biases_fast[step]
+        else:
+            weight = self.weights[step]
+            bias = self.biases[step]
+
+
+        running_mean = self.running_means[step].to(x.device)
+        running_var = self.running_vars[step].to(x.device)
+
+        # Compute batch statistics
+        batch_mean = x.mean([0, 2, 3])
+        batch_var = x.var([0, 2, 3], unbiased=False)
+        momentum = 0.1
+
+        # Update running statistics
+        running_mean = (1 - momentum) * running_mean + momentum * batch_mean.data
+        running_var = (1 - momentum) * running_var + momentum * batch_var.data
+
+        self.running_means[step] = running_mean
+        self.running_vars[step] = running_var
+
+        # Normalize
+        out = F.batch_norm(
+            x, running_mean, running_var, weight, bias,
+            training=False, momentum=0.0, eps=self.eps
+        )
+
+        return out
+
 
 class ConvBlock_bnrs(nn.Module):
     def __init__(self, indim, outdim, pool=True, padding=1, num_steps=6, maml=True):
@@ -478,7 +528,40 @@ class ConvBlock_bnrs(nn.Module):
             else:
                 out = layer(out)
         return out
-        
+
+class ConvBlock_bnwb(nn.Module):
+    def __init__(self, indim, outdim, pool=True, padding=1, num_steps=6, maml=True):
+        super(ConvBlock_bnwb, self).__init__()
+        self.indim = indim
+        self.outdim = outdim
+        self.maml = maml
+
+        if self.maml:
+            self.C = Conv2d_fw(indim, outdim, 3, padding=padding)
+            self.BN = BatchNorm2d_fw_bnwb(outdim, num_steps=num_steps)
+        else:
+            self.C = nn.Conv2d(indim, outdim, 3, padding=padding)
+            self.BN = nn.BatchNorm2d(outdim)
+        self.relu = nn.ReLU(inplace=True)
+
+        self.parametrized_layers = [self.C, self.BN, self.relu]
+        if pool:
+            self.pool = nn.MaxPool2d(2)
+            self.parametrized_layers.append(self.pool)
+
+        for layer in self.parametrized_layers:
+            init_layer(layer)
+
+    def forward(self, x, step=None):
+        out = x
+        for layer in self.parametrized_layers:
+            if isinstance(layer, BatchNorm2d_fw_bnwb):
+                out = layer(out, step)
+            else:
+                out = layer(out)
+        return out
+
+
 class ConvNet_bnrs(nn.Module):
     def __init__(self, depth, flatten=True, num_steps=6, maml=True):
         super(ConvNet_bnrs, self).__init__()
@@ -499,6 +582,31 @@ class ConvNet_bnrs(nn.Module):
         out = x
         for module in self.trunk:
             if isinstance(module, ConvBlock_bnrs):
+                out = module(out, step)
+            else:
+                out = module(out)
+        return out
+
+class ConvNet_bnwb(nn.Module):
+    def __init__(self, depth, flatten=True, num_steps=6, maml=True):
+        super(ConvNet_bnwb, self).__init__()
+        trunk = []
+        for i in range(depth):
+            indim = 3 if i == 0 else 64
+            outdim = 64
+            B = ConvBlock_bnwb(indim, outdim, pool=(i < 4), num_steps=num_steps, maml=maml)
+            trunk.append(B)
+
+        if flatten:
+            trunk.append(Flatten())
+
+        self.trunk = nn.Sequential(*trunk)
+        self.final_feat_dim = 1600
+
+    def forward(self, x, step=None):
+        out = x
+        for module in self.trunk:
+            if isinstance(module, ConvBlock_bnwb):
                 out = module(out, step)
             else:
                 out = module(out)
