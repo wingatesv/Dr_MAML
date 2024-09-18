@@ -30,8 +30,8 @@ class ALFA(MetaTemplate):
         self.classifier.bias.data.fill_(0)
         
         self.n_task = 4  # meta-batch, meta update every meta batch
-        self.task_update_num_initial = 5
-        self.last_task_update_num = self.task_update_num_initial
+        self.task_update_num_max = 5
+        self.last_task_update_num = self.task_update_num_max
         self.train_lr = 0.01  # this is the inner loop learning rate
         self.approx = approx  # first order approx.
         self.alfa = alfa  # enable ALFA mechanism
@@ -48,10 +48,10 @@ class ALFA(MetaTemplate):
             # Convert the generator to a list to get the number of parameters
             parameter_list = list(self.parameters())
             self.alpha_post_multipliers = nn.ParameterList([
-                nn.Parameter(torch.ones(self.task_update_num) * self.init_learning_rate) for _ in range(len(parameter_list))
+                nn.Parameter(torch.ones(self.task_update_num_max) * self.init_learning_rate) for _ in range(len(parameter_list))
             ])
             self.beta_post_multipliers = nn.ParameterList([
-                nn.Parameter(torch.ones(self.task_update_num) * self.init_weight_decay * self.init_learning_rate) for _ in range(len(parameter_list))
+                nn.Parameter(torch.ones(self.task_update_num_max) * self.init_weight_decay * self.init_learning_rate) for _ in range(len(parameter_list))
             ])
 
     def set_epoch(self, epoch):
@@ -80,7 +80,7 @@ class ALFA(MetaTemplate):
 
         # do not anneal the inner steps in meta testing
         if self.test_mode:
-            self.task_update_num = self.task_update_num_initial
+            self.task_update_num = self.task_update_num_max
         else:
             # Calculate task_update_num based on current epoch
             self.task_update_num = half_trapezoidal_step_scheduler(total_epochs = 200, current_epoch = self.current_epoch, max_step = 5, min_step = 1, max_step_width = 0.8, half_right=True)
