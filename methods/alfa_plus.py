@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
+from methods.trap_step_scheduler import half_trapezoidal_step_scheduler
 from tqdm import tqdm
 import utils
 
@@ -21,7 +22,7 @@ class Regularizer(nn.Module):
         return self.network(x)
 
 class ALFA(MetaTemplate):
-    def __init__(self, model_func, n_way, n_support, approx=False, alfa=True):
+    def __init__(self, model_func, n_way, n_support, approx=False, alfa=True, test_mode = False):
         super(ALFA, self).__init__(model_func, n_way, n_support, change_way=False)
 
         self.loss_fn = nn.CrossEntropyLoss()
@@ -29,11 +30,14 @@ class ALFA(MetaTemplate):
         self.classifier.bias.data.fill_(0)
         
         self.n_task = 4  # meta-batch, meta update every meta batch
-        self.task_update_num = 5
+        self.task_update_num_initial = 5
+        self.last_task_update_num = self.task_update_num_initial
         self.train_lr = 0.01  # this is the inner loop learning rate
         self.approx = approx  # first order approx.
         self.alfa = alfa  # enable ALFA mechanism
 
+        self.test_mode = test_mode
+        
         # Initial learning rate and weight decay
         self.init_learning_rate = 1e-3  # from the repo's implementation
         self.init_weight_decay = 5e-4   # from the repo's implementation
@@ -49,8 +53,10 @@ class ALFA(MetaTemplate):
             self.beta_post_multipliers = nn.ParameterList([
                 nn.Parameter(torch.ones(self.task_update_num) * self.init_weight_decay * self.init_learning_rate) for _ in range(len(parameter_list))
             ])
-      
 
+    def set_epoch(self, epoch):
+        self.current_epoch = epoch
+        
     def forward(self, x):
         out = self.feature.forward(x)
         scores = self.classifier.forward(out)
@@ -72,7 +78,17 @@ class ALFA(MetaTemplate):
             weight.fast = None
         self.zero_grad()
 
-       
+        # do not anneal the inner steps in meta testing
+        if self.test_mode:
+            self.task_update_num = self.task_update_num_initial
+        else:
+            # Calculate task_update_num based on current epoch
+            self.task_update_num = half_trapezoidal_step_scheduler(total_epochs = 200, current_epoch = self.current_epoch, max_step = 5, min_step = 1, max_step_width = 0.8, half_right=True)
+            
+        # Print task_update_num if it has changed
+        if self.task_update_num != int(self.last_task_update_num):
+            print(f"task_update_num has changed to: {self.task_update_num}")
+            self.last_task_update_num = self.task_update_num
 
         for task_step in range(self.task_update_num):
             scores = self.forward(x_a_i)
@@ -82,7 +98,7 @@ class ALFA(MetaTemplate):
             if self.approx:
                 grad = [g.detach() for g in grad]  # do not calculate gradient of gradient if using first order approximation
 
-            if self.alfa and regularizer is not None:
+            if self.alfa and regularizer is not None and self.task_update_num == 5:
                # Generate layer-wise means of gradients and weights
                 per_step_task_embedding = []
                 # print(f"Task Step {task_step}:")
@@ -120,7 +136,7 @@ class ALFA(MetaTemplate):
             fast_parameters = []
             for k, weight in enumerate(relevant_parameters):
                 if weight.fast is None:
-                    if self.alfa and regularizer is not None:
+                    if self.alfa and regularizer is not None and self.task_update_num == 5:
                         # print(f"k={k}, task_step={task_step}, num_layers={num_layers}")
                         alpha = generated_alpha[k] * self.alpha_post_multipliers[k][task_step]
                         beta = generated_beta[k] * self.beta_post_multipliers[k][task_step]
@@ -128,7 +144,7 @@ class ALFA(MetaTemplate):
                     else:
                         weight.fast = weight - self.train_lr * grad[k]  # create weight.fast
                 else:
-                    if self.alfa and regularizer is not None:
+                    if self.alfa and regularizer is not None and self.task_update_num == 5:
                         alpha = generated_alpha[k] * self.alpha_post_multipliers[k][task_step]
                         beta = generated_beta[k] * self.beta_post_multipliers[k][task_step]
                         weight.fast = weight.fast - alpha * grad[k] - beta
@@ -155,6 +171,8 @@ class ALFA(MetaTemplate):
         avg_loss = 0
         task_count = 0
         loss_all = []
+        self.test_mode = False
+        self.set_epoch(epoch)
 
         optimizer.zero_grad()
 
@@ -205,6 +223,7 @@ class ALFA(MetaTemplate):
         count = 0
         avg_loss = 0
         acc_all = []
+        self.test_mode = True
 
         iter_num = len(test_loader)
         for i, (x, _) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
