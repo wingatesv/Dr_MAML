@@ -73,9 +73,13 @@ class MAML(MetaTemplate):
         scores  = self.classifier.forward(out)
         return scores
     def get_augmented_views(self, x):
-        # x is a batch of images: [batch_size, channels, height, width]
-        # Apply the transform to each image in the batch
-        x_aug = torch.stack([self.augmentation(img.cpu()).cuda() for img in x])
+        x_aug = []
+        for img in x:
+            img_cpu = img.cpu()
+            img_pil = transforms.ToPILImage()(img_cpu)  # Convert to PIL Image
+            img_aug_pil = self.augmentation(img_pil)    # Apply augmentations
+            x_aug.append(img_aug_pil)
+        x_aug = torch.stack(x_aug).cuda()
         return x_aug
 
     def nt_xent_loss(self, z_i, z_j):
