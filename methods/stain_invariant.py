@@ -12,6 +12,70 @@ import pandas as pd
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
+import torch
+import numpy as np
+
+class NTXentLoss(torch.nn.Module):
+
+    def __init__(self, device, batch_size, temperature, use_cosine_similarity):
+        super(NTXentLoss, self).__init__()
+        self.batch_size = batch_size
+        self.temperature = temperature
+        self.device = device
+        self.softmax = torch.nn.Softmax(dim=-1)
+        self.mask_samples_from_same_repr = self._get_correlated_mask().type(torch.bool)
+        self.similarity_function = self._get_similarity_function(use_cosine_similarity)
+        self.criterion = torch.nn.CrossEntropyLoss(reduction="sum")
+
+    def _get_similarity_function(self, use_cosine_similarity):
+        if use_cosine_similarity:
+            self._cosine_similarity = torch.nn.CosineSimilarity(dim=-1)
+            return self._cosine_simililarity
+        else:
+            return self._dot_simililarity
+    def _get_correlated_mask(self):
+        diag = np.eye(2 * self.batch_size)
+        l1 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=-self.batch_size)
+        l2 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=self.batch_size)
+        mask = torch.from_numpy((diag + l1 + l2))
+        mask = (1 - mask).type(torch.bool)
+        return mask.to(self.device)
+
+    @staticmethod
+    def _dot_simililarity(x, y):
+        v = torch.tensordot(x.unsqueeze(1), y.T.unsqueeze(0), dims=2)
+        # x shape: (N, 1, C)
+        # y shape: (1, C, 2N)
+        # v shape: (N, 2N)
+        return v
+
+    def _cosine_simililarity(self, x, y):
+        # x shape: (N, 1, C)
+        # y shape: (1, 2N, C)
+        # v shape: (N, 2N)
+        v = self._cosine_similarity(x.unsqueeze(1), y.unsqueeze(0))
+        return v
+
+    def forward(self, zis, zjs):
+        representations = torch.cat([zjs, zis], dim=0)
+
+        similarity_matrix = self.similarity_function(representations, representations)
+
+        # filter out the scores from the positive samples
+        l_pos = torch.diag(similarity_matrix, self.batch_size)
+        r_pos = torch.diag(similarity_matrix, -self.batch_size)
+        positives = torch.cat([l_pos, r_pos]).view(2 * self.batch_size, 1)
+
+        negatives = similarity_matrix[self.mask_samples_from_same_repr].view(2 * self.batch_size, -1)
+
+        logits = torch.cat((positives, negatives), dim=1)
+        logits /= self.temperature
+
+        labels = torch.zeros(2 * self.batch_size).to(self.device).long()
+        loss = self.criterion(logits, labels)
+
+        return loss / (2 * self.batch_size)
+
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
         super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
@@ -32,7 +96,20 @@ class MAML(MetaTemplate):
         self.val_loss = 0
         self.current_epoch = 0
         self.temperature = 0.07  # Temperature parameter for contrastive loss
+        # Device setup
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+        # Batch size for contrastive loss
+        self.batch_size = n_way * n_support
+
+        # Initialize NTXentLoss
+        self.nt_xent_criterion = NTXentLoss(
+            device=self.device,
+            batch_size=self.batch_size,
+            temperature=self.temperature,
+            use_cosine_similarity=True
+        )
+        
         # Define data augmentations for self-supervised contrastive learning
         self.augmentation = transforms.Compose([
             transforms.RandomHorizontalFlip(),
@@ -82,49 +159,6 @@ class MAML(MetaTemplate):
         x_aug = torch.stack(x_aug).cuda()
         return x_aug
 
-    def nt_xent_loss(self, z_i, z_j):
-        """
-        Computes the NT-Xent loss between two batches of embeddings z_i and z_j.
-        Args:
-            z_i: Embeddings of the first augmented batch, shape [N, D]
-            z_j: Embeddings of the second augmented batch, shape [N, D]
-        Returns:
-            loss: Scalar NT-Xent loss
-        """
-        device = z_i.device
-        batch_size = z_i.shape[0]
-        temperature = self.temperature
-
-        # Normalize embeddings
-        z_i = F.normalize(z_i, dim=1)
-        z_j = F.normalize(z_j, dim=1)
-
-        # Concatenate embeddings
-        representations = torch.cat([z_i, z_j], dim=0)  # [2N, D]
-
-        # Compute similarity matrix
-        similarity_matrix = torch.matmul(representations, representations.T)  # [2N, 2N]
-        similarity_matrix = similarity_matrix / temperature
-
-        # Remove self-similarities from the matrix
-        labels = torch.arange(batch_size, device=device)
-        labels = torch.cat([labels, labels], dim=0)
-        masks = F.one_hot(labels, num_classes=2 * batch_size).float()
-        logits_mask = torch.ones_like(masks) - torch.eye(2 * batch_size, device=device)
-        masks = masks * logits_mask  # Zero out self-similarities
-
-        # Compute log probabilities
-        exp_sim = torch.exp(similarity_matrix) * logits_mask
-        log_prob = similarity_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True) + 1e-12)
-
-        # Compute mean of log-likelihood over positive pairs
-        mean_log_prob_pos = (masks * log_prob).sum(dim=1) / masks.sum(dim=1)
-
-        # Loss
-        loss = -mean_log_prob_pos.mean()
-
-        return loss
-
     def set_forward(self,x, is_feature = False):
         assert is_feature == False, 'MAML do not support fixed feature' 
         
@@ -154,7 +188,7 @@ class MAML(MetaTemplate):
             z_j = self.feature.forward(x_j)
 
             # Compute contrastive loss
-            contrastive_loss = self.nt_xent_loss(z_i, z_j)
+            contrastive_loss = self.nt_xent_criterion(z_i, z_j)
           
             scores = self.forward(x_a_i)
             classification_loss = self.loss_fn( scores, y_a_i) 
