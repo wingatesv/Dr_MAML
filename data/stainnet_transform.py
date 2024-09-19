@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from PIL import Image
 import numpy as np
+import torch.nn.functional as F
 
 STAINNET_WEIGHTS = '/content/Dr_MAML/data/StainNet-Public-centerUni_layer3_ch32.pth'
 
@@ -58,3 +59,36 @@ class StainNetTransform(object):
         image = image.detach().cpu().numpy()[0]
         image = ((image * 0.5 + 0.5) * 255).astype(np.uint8).transpose((1, 2, 0))
         return image
+
+
+class StainNetTransform_2(nn.Module):
+    def __init__(self, device):
+        super(StainNetTransform_2, self).__init__()
+        self.stainnet_model = StainNet()
+        self.stainnet_model.load_state_dict(torch.load(STAINNET_WEIGHTS, map_location=device))
+        self.stainnet_model.to(device)
+        self.stainnet_model.eval()  # Set model to evaluation mode
+        self.device = device
+        # Ensure model parameters are not updated during training
+        for param in self.stainnet_model.parameters():
+            param.requires_grad = False
+
+    def forward(self, images):
+        # images: tensor of shape [B, C, H, W] in range [0, 1]
+        images = images.to(self.device)
+        images = self.norm(images)
+        with torch.no_grad():
+            images = self.stainnet_model(images)
+        images = self.un_norm(images)
+        return images
+
+    def norm(self, images):
+        # Normalize images to [-1, 1]
+        images = (images - 0.5) / 0.5
+        return images
+
+    def un_norm(self, images):
+        # Unnormalize images back to [0, 1]
+        images = (images * 0.5) + 0.5
+        images = torch.clamp(images, 0.0, 1.0)
+        return images
