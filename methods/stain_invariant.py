@@ -11,9 +11,7 @@ from tqdm import tqdm
 import pandas as pd
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-
-import torch
-import numpy as np
+import kornia.augmentation as K
 
 class NTXentLoss(torch.nn.Module):
 
@@ -109,17 +107,22 @@ class MAML(MetaTemplate):
             temperature=self.temperature,
             use_cosine_similarity=True
         )
-        
+        # Include in your augmentation pipeline
+        self.augmentation = nn.Sequential(
+            K.RandomHorizontalFlip(),
+            K.ColorJitter(0.4, 0.4, 0.4, 0.1),
+            K.RandomGrayscale(p=0.2)
+        )
         # Define data augmentations for self-supervised contrastive learning
-        self.augmentation = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.4)
-            ], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            # Ensure tensors are in the correct range
-            transforms.ToTensor()
-        ])
+        # self.augmentation = transforms.Compose([
+        #     transforms.RandomHorizontalFlip(),
+        #     transforms.RandomApply([
+        #         transforms.ColorJitter(0.4, 0.4, 0.4, 0.4)
+        #     ], p=0.8),
+        #     transforms.RandomGrayscale(p=0.2),
+        #     # Ensure tensors are in the correct range
+        #     transforms.ToTensor()
+        # ])
          # Store metrics for plotting
         self.metrics = {
             'epochs': [],
@@ -150,14 +153,19 @@ class MAML(MetaTemplate):
         scores  = self.classifier.forward(out)
         return scores
     def get_augmented_views(self, x):
-        x_aug = []
-        for img in x:
-            img_cpu = img.cpu()
-            img_pil = transforms.ToPILImage()(img_cpu)  # Convert to PIL Image
-            img_aug_pil = self.augmentation(img_pil)    # Apply augmentations
-            x_aug.append(img_aug_pil)
-        x_aug = torch.stack(x_aug).cuda()
+        # x is a tensor of shape [batch_size, channels, height, width]
+        x_aug = self.augmentation(x)
         return x_aug
+        
+    # def get_augmented_views(self, x):
+    #     x_aug = []
+    #     for img in x:
+    #         img_cpu = img.cpu()
+    #         img_pil = transforms.ToPILImage()(img_cpu)  # Convert to PIL Image
+    #         img_aug_pil = self.augmentation(img_pil)    # Apply augmentations
+    #         x_aug.append(img_aug_pil)
+    #     x_aug = torch.stack(x_aug).cuda()
+    #     return x_aug
 
     def set_forward(self,x, is_feature = False):
         assert is_feature == False, 'MAML do not support fixed feature' 
