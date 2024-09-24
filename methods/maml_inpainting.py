@@ -10,12 +10,13 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
+import random
 
 class MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
         super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
-        self.feature = backbone.Conv4(4, flatten=False)
+        self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
@@ -195,10 +196,10 @@ class MAML(MetaTemplate):
             optimizer.zero_grad()
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
-            self.train_loss = avg_loss/len(train_loader)
-            self.train_confidence = sum(all_confidences) / len(all_confidences)
-            self.train_entropy = sum(all_entropies) / len(all_entropies)
-            self.grad_norm = sum(grad_norms) / len(grad_norms)
+        self.train_loss = avg_loss/len(train_loader)
+        self.train_confidence = sum(all_confidences) / len(all_confidences)
+        self.train_entropy = sum(all_entropies) / len(all_entropies)
+        self.grad_norm = sum(grad_norms) / len(grad_norms)
 
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
