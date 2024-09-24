@@ -613,6 +613,65 @@ class ConvNet_bnwb(nn.Module):
         return out
 
 
+class InpaintingHead(nn.Module):
+    def __init__(self, input_channels=64, output_channels=3):
+        super(InpaintingHead, self).__init__()
+        
+        # Upsampling layers (Upsample + Conv2d)
+        self.up1 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
+            nn.InstanceNorm2d(64),
+            nn.LeakyReLU(0.01, inplace=True)
+        )
+        self.up2 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Conv2d(64, 32, kernel_size=3, padding=1),
+            nn.InstanceNorm2d(32),
+            nn.LeakyReLU(0.01, inplace=True)
+        )
+        self.up3 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Conv2d(32, 16, kernel_size=3, padding=1),
+            nn.InstanceNorm2d(16),
+            nn.LeakyReLU(0.01, inplace=True)
+        )
+        self.up4 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Conv2d(16, 8, kernel_size=3, padding=1),
+            nn.InstanceNorm2d(8),
+            nn.LeakyReLU(0.01, inplace=True)
+        )
+        # Final convolution
+        self.conv_final = nn.Conv2d(8, output_channels, kernel_size=3, padding=1)
+        
+        # Final upsampling layer to adjust the output size to (84x84)
+        self.upsample_final = nn.Upsample(size=(84, 84), mode='bilinear', align_corners=True)
+        
+    def forward(self, x, encoder_features=None):
+        # Incorporate skip connections if encoder_features are provided
+        if encoder_features:
+            x = self.up1(x)
+            x = torch.cat([x, encoder_features[3]], dim=1)
+            x = self.up2(x)
+            x = torch.cat([x, encoder_features[2]], dim=1)
+            x = self.up3(x)
+            x = torch.cat([x, encoder_features[1]], dim=1)
+            x = self.up4(x)
+            x = torch.cat([x, encoder_features[0]], dim=1)
+        else:
+            x = self.up1(x)
+            x = self.up2(x)
+            x = self.up3(x)
+            x = self.up4(x)
+        
+        x = self.conv_final(x)
+        # Upsample to (84, 84)
+        x = self.upsample_final(x)
+        # Apply activation function
+        x = torch.sigmoid(x)  # or torch.tanh(x) based on your input normalization
+        return x
+
 def Conv4():
     return ConvNet(4)
 
