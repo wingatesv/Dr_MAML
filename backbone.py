@@ -613,37 +613,57 @@ class ConvNet_bnwb(nn.Module):
         return out
 
 
+class InstanceNorm2d_fw(nn.InstanceNorm2d):
+    def __init__(self, num_features, affine=True, track_running_stats=False):
+        super(InstanceNorm2d_fw, self).__init__(num_features, affine=affine, track_running_stats=track_running_stats)
+        if affine:
+            self.weight.fast = None
+            self.bias.fast = None
+
+    def forward(self, x):
+        if self.affine and self.weight.fast is not None and self.bias.fast is not None:
+            weight = self.weight.fast
+            bias = self.bias.fast
+        else:
+            weight = self.weight
+            bias = self.bias
+
+        return F.instance_norm(
+            x, self.running_mean, self.running_var, weight, bias,
+            self.training or not self.track_running_stats,
+            self.momentum, self.eps)
+
 class InpaintingHead(nn.Module):
     def __init__(self, input_channels=64, output_channels=3):
         super(InpaintingHead, self).__init__()
         
-        # Upsampling layers (Upsample + Conv2d)
+        # Upsampling layers (Upsample + Conv2d_fw)
         self.up1 = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='nearest'),
-            nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
-            nn.InstanceNorm2d(64),
+            Conv2d_fw(input_channels, 64, kernel_size=3, padding=1),
+            InstanceNorm2d_fw(64),
             nn.LeakyReLU(0.01, inplace=True)
         )
         self.up2 = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='nearest'),
-            nn.Conv2d(64, 32, kernel_size=3, padding=1),
-            nn.InstanceNorm2d(32),
+            Conv2d_fw(64, 32, kernel_size=3, padding=1),
+            InstanceNorm2d_fw(32),
             nn.LeakyReLU(0.01, inplace=True)
         )
         self.up3 = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='nearest'),
-            nn.Conv2d(32, 16, kernel_size=3, padding=1),
-            nn.InstanceNorm2d(16),
+            Conv2d_fw(32, 16, kernel_size=3, padding=1),
+            InstanceNorm2d_fw(16),
             nn.LeakyReLU(0.01, inplace=True)
         )
         self.up4 = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='nearest'),
-            nn.Conv2d(16, 8, kernel_size=3, padding=1),
-            nn.InstanceNorm2d(8),
+            Conv2d_fw(16, 8, kernel_size=3, padding=1),
+            InstanceNorm2d_fw(8),
             nn.LeakyReLU(0.01, inplace=True)
         )
         # Final convolution
-        self.conv_final = nn.Conv2d(8, output_channels, kernel_size=3, padding=1)
+        self.conv_final = Conv2d_fw(8, output_channels, kernel_size=3, padding=1)
         
         # Final upsampling layer to adjust the output size to (84x84)
         self.upsample_final = nn.Upsample(size=(84, 84), mode='bilinear', align_corners=True)
@@ -671,6 +691,7 @@ class InpaintingHead(nn.Module):
         # Apply activation function
         x = torch.sigmoid(x)  # or torch.tanh(x) based on your input normalization
         return x
+
 
 def Conv4():
     return ConvNet(4)
