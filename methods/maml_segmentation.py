@@ -108,7 +108,7 @@ class MAML(MetaTemplate):
             set_loss_cls = self.loss_fn( scores, y_a_i) 
 
             # Inpainting forward pass
-            features = self.feature(masked_images)
+            features = self.feature(x_a_i)
             predicted_masks = self.inpainting_head(features)
     
             # Compute inpainting loss on masked regions
