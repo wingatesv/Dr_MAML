@@ -37,7 +37,7 @@ class MAML(MetaTemplate):
 
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
-        self.mse_loss = nn.MSELoss()
+        self.mse_loss = nn.L1Loss()
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         self.test_mode  = test_mode
