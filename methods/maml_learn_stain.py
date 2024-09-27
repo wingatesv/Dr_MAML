@@ -69,6 +69,9 @@ class MAML(MetaTemplate):
             'confidence': [],
             'entropy': [],
         }
+    def parameters(self):
+        # Override the parameters method to exclude StainNet's parameters
+        return (param for name, param in self.named_parameters() if not name.startswith('stainnet_model'))
         
     def set_epoch(self, epoch):
         self.current_epoch = epoch
@@ -88,12 +91,34 @@ class MAML(MetaTemplate):
         out = out.view(out.size(0), -1)
         scores  = self.classifier.forward(out)
         return scores
-      
+
+    def unnormalize(self, images, mean, std):
+        # images: Tensor of shape (batch_size, channels, H, W)
+        # mean and std: lists of mean and std values for each channel
+        mean = torch.tensor(mean).view(1, -1, 1, 1).to(images.device)
+        std = torch.tensor(std).view(1, -1, 1, 1).to(images.device)
+        images = images * std + mean
+        return images
+
+    def normalize(self, images, mean, std):
+        mean = torch.tensor(mean).view(1, -1, 1, 1).to(images.device)
+        std = torch.tensor(std).view(1, -1, 1, 1).to(images.device)
+        images = (images - mean) / std
+        return images
+
     def stain_normalize(self, images):
       # images: Tensor of shape (batch_size, 3, H, W), expected in range [0, 1] or [-1, 1]
   
       # Clone images to avoid modifying the original tensor
       images = images.clone()
+
+      # Define mean and std used during normalization
+      mean = [0.485, 0.456, 0.406]
+      std = [0.229, 0.224, 0.225]
+    
+      # Unnormalize the images to bring them back to [0, 1] range
+      images = self.unnormalize(images, mean, std)
+
 
       # Check the pixel value range
       min_val = images.min()
@@ -115,6 +140,9 @@ class MAML(MetaTemplate):
   
       # The output of StainNet is in the range [-1, 1]; convert back to [0, 1]
       normalized_images = (normalized_images + 1) / 2
+
+      # Re-apply the normalization
+      normalized_images = self.normalize(normalized_images, mean, std)
   
       # Ensure the output has the same shape as the input
       assert normalized_images.shape == images.shape, \
