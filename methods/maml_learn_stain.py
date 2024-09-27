@@ -147,7 +147,7 @@ class MAML(MetaTemplate):
 
             # Inpainting forward pass
             features = self.feature(x_a_i)
-            predicted_images = self.stain_normalization_head(features)
+            predicted_images = self.inpainting_head(features)
 
             # Compute stain normalization loss
             stain_normalization_loss = self.mse_loss(predicted_images, stain_normalized_images)
