@@ -121,9 +121,9 @@ class MAML(MetaTemplate):
 
 
       # Check the pixel value range
-      min_val = images.min()
-      max_val = images.max()
-      print(f'Input images pixel range: [{min_val.item()}, {max_val.item()}]')
+      # min_val = images.min()
+      # max_val = images.max()
+      # print(f'Input images pixel range: [{min_val.item()}, {max_val.item()}]')
   
       # Ensure images are in the range [-1, 1]
       if images.min() >= 0 and images.max() <= 1:
