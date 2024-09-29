@@ -14,3 +14,4 @@ from . import tra_anil
 from . import ppo_torch
 from . import environment
 from . import ppo_maml
+from . import aux_maml
