@@ -1,4 +1,4 @@
-# This code is modified from https://github.com/dragen1860/MAML-Pytorch and https://github.com/katerakelly/pytorch-maml 
+# This code is modified from https://github.com/dragen1860/Aux_MAML-Pytorch and https://github.com/katerakelly/pytorch-Aux_MAML 
 
 import backbone
 import torch
@@ -31,9 +31,9 @@ class StainNet(nn.Module):
     def forward(self, x):
         return self.rgb_trans(x)
 
-class MAML(MetaTemplate):
+class Aux_MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
-        super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
+        super(Aux_MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
@@ -151,7 +151,7 @@ class MAML(MetaTemplate):
       return normalized_images
 
     def set_forward(self,x, is_feature = False):
-        assert is_feature == False, 'MAML do not support fixed feature' 
+        assert is_feature == False, 'Aux_MAML do not support fixed feature' 
         
         x = x.cuda()
         x_var = Variable(x)
@@ -201,7 +201,7 @@ class MAML(MetaTemplate):
         return scores
 
     def set_forward_adaptation(self,x, is_feature = False): #overwrite parrent function
-        raise ValueError('MAML performs further adapation simply by increasing task_upate_num')
+        raise ValueError('Aux_MAML performs further adapation simply by increasing task_upate_num')
 
 
     def set_forward_loss(self, x):
@@ -228,7 +228,7 @@ class MAML(MetaTemplate):
         for i, (x,_) in enumerate(train_loader):
 
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way  ==  x.size(0), "MAML do not support way change"
+            assert self.n_way  ==  x.size(0), "Aux_MAML do not support way change"
             
 
             loss, scores = self.set_forward_loss(x)
@@ -248,7 +248,7 @@ class MAML(MetaTemplate):
 
             task_count += 1
 
-            if task_count == self.n_task: #MAML update several tasks at one time
+            if task_count == self.n_task: #Aux_MAML update several tasks at one time
        
                 loss_q = torch.stack(loss_all).sum(0)
                 loss_value = loss_q.item()
@@ -284,7 +284,7 @@ class MAML(MetaTemplate):
         # for i, (x,_) in enumerate(test_loader):
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
-            assert self.n_way  ==  x.size(0), "MAML do not support way change"
+            assert self.n_way  ==  x.size(0), "Aux_MAML do not support way change"
             correct_this, count_this, loss = self.correct(x)
             acc_all.append(correct_this/ count_this *100 )
             avg_loss = avg_loss+loss.item()
