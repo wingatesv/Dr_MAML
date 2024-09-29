@@ -29,7 +29,7 @@ from methods.reptile import Reptile
 from methods.anneal_maml import ANNEMAML
 from methods.tra_anil import TRA_ANIL
 from methods.xmaml import XMAML
-from methods.ppo_maml import PPO_MAML
+from methods.aux_maml import Aux_MAML
 
 
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file, set_seed
@@ -110,7 +110,7 @@ if __name__ == '__main__':
         loss_type = 'mse' if params.method == 'relationnet' else 'softmax'
         model           = RelationNet( feature_model, loss_type = loss_type , **few_shot_params )
 
-    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
+    elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'aux_maml', 'alfa', 'reptile']:
 
       backbone.ConvBlock.maml = True
       backbone.SimpleBlock.maml = True
@@ -130,8 +130,8 @@ if __name__ == '__main__':
         model = ALFA(  model_dict[params.model], approx = False , **few_shot_params )
         regularizer = Regularizer().cuda()
 
-      elif params.method == 'ppo_maml':
-        model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = checkpoint_dir, test_mode = True, **few_shot_params )
+      elif params.method == 'aux_maml':
+        model = Aux_MAML(  model_dict[params.model], approx = False, **few_shot_params )
 
       elif params.method == 'annemaml':     
         if params.anneal_param != 'none':
@@ -191,7 +191,7 @@ if __name__ == '__main__':
         split_str = split
 
         
-    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']: #maml do not support testing with feature
+    if params.method in ['maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'aux_maml', 'alfa', 'reptile']: #maml do not support testing with feature
         if 'Conv' in params.model:
             image_size = 84 
   
