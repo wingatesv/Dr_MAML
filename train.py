@@ -30,10 +30,10 @@ from methods.tra_anil import TRA_ANIL
 from methods.xmaml import XMAML
 from methods.alfa import ALFA, Regularizer
 from methods.reptile import Reptile
+from methods.aux_maml import Aux_MAML
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
-from methods.ppo_maml import PPO_MAML
 
 
 
@@ -253,7 +253,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'aux_maml', 'alfa', 'reptile']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -283,7 +283,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'aux_maml', 'alfa', 'reptile']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -292,8 +292,8 @@ if __name__=='__main__':
           if params.method in ['maml', 'maml_approx']:
             model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
 
-          elif params.method == 'ppo_maml':
-            model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = params.checkpoint_dir, **train_few_shot_params )
+          elif params.method == 'aux_maml':
+            model = Aux_MAML(  model_dict[params.model], approx = False, **train_few_shot_params )
 
           elif params.method == 'reptile':
             model = Reptile(  model_dict[params.model], **train_few_shot_params )
