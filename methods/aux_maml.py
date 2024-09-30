@@ -54,7 +54,7 @@ class Aux_MAML(MetaTemplate):
         self.val_loss = 0
         self.current_epoch = 0
 
-        if self.aux_task == 'sn'
+        if self.aux_task == 'sn':
             # Initialize the StainNet model
             STAINNET_WEIGHTS = '/content/Dr_MAML/data/StainNet-Public-centerUni_layer3_ch32.pth'
             self.stainnet_model = StainNet().cuda()
