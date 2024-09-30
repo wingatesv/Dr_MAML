@@ -62,6 +62,7 @@ class Aux_MAML(MetaTemplate):
             self.stainnet_model.eval()  # Set the model to evaluation mode
 
         output_channels = 3 if self.aux_task in ['inpainting', 'sn'] else 1
+        print(output_channels)
         self.inpainting_head = backbone.InpaintingHead(input_channels=64, output_channels=output_channels)
          # Store metrics for plotting
         self.metrics = {
