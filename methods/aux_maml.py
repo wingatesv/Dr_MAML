@@ -34,10 +34,10 @@ class StainNet(nn.Module):
 class Aux_MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
         super(Aux_MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
-
+        self.aux_task = 'sn' #inpainting, segmentation
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
-        self.mse_loss = nn.L1Loss()
+
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
         self.test_mode  = test_mode
@@ -58,7 +58,8 @@ class Aux_MAML(MetaTemplate):
         self.stainnet_model.load_state_dict(torch.load(STAINNET_WEIGHTS))
         self.stainnet_model.eval()  # Set the model to evaluation mode
 
-        self.inpainting_head = backbone.InpaintingHead(input_channels=64, output_channels=3)
+        output_channels = 3 if self.aux_task in ['inpainting', 'sn'] else 1
+        self.inpainting_head = backbone.InpaintingHead(input_channels=64, output_channels=output_channels)
          # Store metrics for plotting
         self.metrics = {
             'epochs': [],
@@ -149,7 +150,41 @@ class Aux_MAML(MetaTemplate):
           f'Expected output shape {images.shape}, but got {normalized_images.shape}'
   
       return normalized_images
+        
+    def random_block_mask(self, images, mask_size_ratio=0.1):
+        batch_size, _, h, w = images.shape
+        masks = torch.ones((batch_size, 1, h, w), device=images.device)
+        block_size = int((mask_size_ratio ** 0.5) * h)  # Block side based on the desired mask ratio
+    
+        for i in range(batch_size):
+            y = random.randint(0, h - block_size)
+            x = random.randint(0, w - block_size)
+            masks[i, :, y:y + block_size, x:x + block_size] = 0  # Mask out a block in each image
+    
+        masks = masks.expand(-1, images.size(1), -1, -1)  # Expand to match the number of channels
+        masked_images = images * masks
+        return masked_images, masks
 
+    def generate_otsu_mask(self, image_batch):
+        batch_size, _, h, w = image_batch.size()
+        masks = torch.zeros(batch_size, 1, h, w).cuda()
+    
+        for i in range(batch_size):
+            # Convert to numpy, grayscale, and apply Otsu's thresholding
+            image_np = image_batch[i].permute(1, 2, 0).cpu().numpy()  # Convert to (H, W, C)
+            gray_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+            gray_image = cv2.GaussianBlur(gray_image, (5, 5), 0)  # Apply Gaussian Blur
+            gray_image_uint8 = cv2.normalize(gray_image, None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
+    
+            # Apply Otsu's thresholding
+            _, mask = cv2.threshold(gray_image_uint8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # Convert back to tensor and normalize mask values to 0 and 1
+            mask = torch.from_numpy(mask).float().unsqueeze(0) / 255.0
+            masks[i] = mask
+    
+        return masks.cuda()
+        
     def set_forward(self,x, is_feature = False):
         assert is_feature == False, 'Aux_MAML do not support fixed feature' 
         
@@ -159,9 +194,17 @@ class Aux_MAML(MetaTemplate):
         x_b_i = x_var[:,self.n_support:,:,:,:].contiguous().view( self.n_way* self.n_query,   *x.size()[2:]) #query data
         y_a_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_support ) )).cuda() #label for support data
 
-        # Generate stain-normalized images for the support data
-        with torch.no_grad():
-            stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
+
+        if self.aux_task == 'sn':
+            # Generate stain-normalized images for the support data
+            with torch.no_grad():
+                stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
+        elif self.aux_task == 'inpainting':
+            # Generate masked images and masks for the inpainting task
+            masked_images, masks = self.random_block_mask(x_a_i)
+        elif self.aux_task == 'segmentation':
+            #  Generate segmentation masks using Otsu's method
+            tissue_masks = self.generate_otsu_mask(x_a_i)  # Generates binary masks for support data
         
         fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
         for weight in self.parameters():
@@ -173,15 +216,30 @@ class Aux_MAML(MetaTemplate):
             scores = self.forward(x_a_i)
             set_loss_cls = self.loss_fn( scores, y_a_i) 
 
-            # Inpainting forward pass
-            features = self.feature(x_a_i)
-            predicted_images = self.inpainting_head(features)
+            if self.aux_task == 'sn':
+                # Inpainting forward pass
+                features = self.feature(x_a_i)
+                predicted_images = self.inpainting_head(features)
+                # Compute stain normalization loss
+                aux_loss = nn.L1Loss()(predicted_images, stain_normalized_images)
 
-            # Compute stain normalization loss
-            stain_normalization_loss = self.mse_loss(predicted_images, stain_normalized_images)
+            elif self.aux_task == 'inpainting':
+                 # Inpainting forward pass
+                features = self.feature(masked_images)
+                reconstructed_images = self.inpainting_head(features)
+                # Compute inpainting loss on masked regions
+                aux_loss = F.mse_loss(reconstructed_images * (1 - masks), x_a_i * (1 - masks))
+                
+            elif self.aux_task == 'segmentation':
+                 # Inpainting forward pass
+                features = self.feature(x_a_i)
+                predicted_masks = self.inpainting_head(features)
+                # Compute inpainting loss on masked regions
+                aux_loss = nn.BCELoss()(predicted_masks, tissue_masks)  # Binary cross-entropy loss
+            
     
             # Total loss
-            total_loss = set_loss_cls + 0.5 * stain_normalization_loss
+            total_loss = set_loss_cls + 0.5 * aux_loss
 
             grad = torch.autograd.grad(total_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
             if self.approx:
