@@ -35,6 +35,7 @@ class Aux_MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
         super(Aux_MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
         self.aux_task = 'sn' #inpainting, segmentation
+        print('aux_task': self.aux_task)
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
 
