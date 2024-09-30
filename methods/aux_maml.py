@@ -10,9 +10,9 @@ from methods.meta_template import MetaTemplate
 from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
+import random
 
 
-STAINNET_WEIGHTS = '/content/Dr_MAML/data/StainNet-Public-centerUni_layer3_ch32.pth'
 
 class StainNet(nn.Module):
     def __init__(self, input_nc=3, output_nc=3, n_layer=3, n_channel=32, kernel_size=1):
@@ -54,10 +54,12 @@ class Aux_MAML(MetaTemplate):
         self.val_loss = 0
         self.current_epoch = 0
 
-        # Initialize the StainNet model
-        self.stainnet_model = StainNet().cuda()
-        self.stainnet_model.load_state_dict(torch.load(STAINNET_WEIGHTS))
-        self.stainnet_model.eval()  # Set the model to evaluation mode
+        if self.aux_task == 'sn'
+            # Initialize the StainNet model
+            STAINNET_WEIGHTS = '/content/Dr_MAML/data/StainNet-Public-centerUni_layer3_ch32.pth'
+            self.stainnet_model = StainNet().cuda()
+            self.stainnet_model.load_state_dict(torch.load(STAINNET_WEIGHTS, weights_only=True))
+            self.stainnet_model.eval()  # Set the model to evaluation mode
 
         output_channels = 3 if self.aux_task in ['inpainting', 'sn'] else 1
         self.inpainting_head = backbone.InpaintingHead(input_channels=64, output_channels=output_channels)
