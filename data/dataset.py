@@ -37,7 +37,7 @@ class SimpleDataset:
 
 
 class SetDataset:
-    def __init__(self, data_file, batch_size, transform):
+    def __init__(self, data_file, batch_size, transform, label_folder=None):
         with open(data_file, 'r') as f:
             self.meta = json.load(f)
  
@@ -56,7 +56,7 @@ class SetDataset:
                                   num_workers = 0, #use main thread only or may receive multiple batches
                                   pin_memory = False)        
         for cl in self.cl_list:
-            sub_dataset = SubDataset(self.sub_meta[cl], cl, transform = transform )
+            sub_dataset = SubDataset(self.sub_meta[cl], cl, transform = transform, label_folder=label_folder)
             self.sub_dataloader.append( torch.utils.data.DataLoader(sub_dataset, **sub_data_loader_params) )
 
     def __getitem__(self,i):
@@ -66,20 +66,35 @@ class SetDataset:
         return len(self.cl_list)
 
 class SubDataset:
-    def __init__(self, sub_meta, cl, transform=transforms.ToTensor(), target_transform=identity):
+    def __init__(self, sub_meta, cl, transform=transforms.ToTensor(), target_transform=identity, label_folder=None):
         self.sub_meta = sub_meta
         self.cl = cl 
         self.transform = transform
         self.target_transform = target_transform
+        self.label_folder = label_folder  # Path to segmentation mask labels folder
 
    
     def __getitem__(self,i):
         image_path = os.path.join( self.sub_meta[i])
         img = Image.open(image_path).convert('RGB')
 
+        # Load segmentation mask only if label_folder is provided
+        if self.label_folder is not None:
+            mask_name = os.path.basename(image_path).replace('.jpg', '_labels.npy')  # Assuming .jpg format for images
+            mask_path = os.path.join(self.label_folder, mask_name)
+            mask = np.load(mask_path)
+            mask = torch.from_numpy(mask).long()  # Convert to tensor and appropriate type for segmentation
+        else:
+            mask = None  # No mask, handle main classification task only
+
         img = self.transform(img)
         target = self.target_transform(self.cl)
-        return img, target
+        
+         # If mask is available, return it; otherwise, return just img and target
+        if mask is not None:
+            return img, mask, target
+        else:
+            return img, target
 
     def __len__(self):
         return len(self.sub_meta)
