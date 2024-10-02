@@ -80,8 +80,10 @@ class SubDataset:
 
         # Load segmentation mask only if label_folder is provided
         if self.label_folder is not None:
-            mask_name = os.path.basename(image_path).replace('.jpg', '_labels.npy')  # Assuming .jpg format for images
-            mask_path = os.path.join(self.label_folder, mask_name)
+             # Extract the class directory from the image path
+            class_dir = os.path.basename(os.path.dirname(image_path))  # Get the class directory (e.g., mucinous_carcinoma)
+            mask_name = os.path.basename(image_path).replace('.png', '_labels.npy')  # Assuming .jpg format for images
+            mask_path = os.path.join(self.label_folder, class_dir, mask_name)  # Add class_dir to mask_path
             mask = np.load(mask_path)
             mask = torch.from_numpy(mask).long()  # Convert to tensor and appropriate type for segmentation
         else:
