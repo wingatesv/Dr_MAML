@@ -33,7 +33,7 @@ from methods.reptile import Reptile
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
-from methods.aux_maml import Aux_MAML
+from methods.aux_maml_2 import Aux_MAML
 
 
 
@@ -162,37 +162,43 @@ def visualize_batch(dataloader):
         images, labels = data
         masks = None  # No mask available
     
-    # Convert images from tensor to numpy for visualization
-    images_np = images.permute(0, 2, 3, 1).numpy()  # Move channels to last dimension for matplotlib
-    labels_np = labels.numpy()
+    print(images.shape)
+    # The tensor has shape [batch_size, num_images, channels, height, width]
+    batch_size, num_images, channels, height, width = images.shape
 
-    # Visualize the first few images, masks, and labels in the batch
-    for i in range(min(len(images), 4)):  # Visualize up to 4 examples
-        plt.figure(figsize=(12, 4))
-        
-        # Show the image
-        plt.subplot(1, 3, 1)
-        plt.imshow(images_np[i])
-        plt.title(f"Image {i+1}")
-        plt.axis('off')
-        
-        # If masks are available, show the mask
-        if masks is not None:
-            mask_np = masks[i].numpy()  # Convert the mask to numpy
-            plt.subplot(1, 3, 2)
-            plt.imshow(mask_np, cmap='gray')
-            plt.title(f"Mask {i+1}")
+    # Iterate over the batch (for each task)
+    for i in range(min(batch_size, 4)):  # Limit to 4 tasks for visualization
+        for j in range(min(num_images, 4)):  # Visualize up to 4 images per task
+            plt.figure(figsize=(12, 4))
+            
+            # Extract each individual image and permute the dimensions
+            img = images[i, j].permute(1, 2, 0).numpy()  # Convert to [height, width, channels] for visualization
+
+            # Show the image
+            plt.subplot(1, 3, 1)
+            plt.imshow(img)
+            plt.title(f"Task {i+1}, Image {j+1}")
             plt.axis('off')
 
-        # Show the label
-        plt.subplot(1, 3, 3)
-        plt.text(0.5, 0.5, f"Label: {labels_np[i]}", fontsize=12, ha='center')
-        plt.title(f"Label {i+1}")
-        plt.axis('off')
+            # If masks are available, show the mask
+            if masks is not None:
+                mask = masks[i, j].numpy()  # Convert the mask to numpy
+                if mask.ndim == 3:  # If the mask has 3 dimensions
+                    mask = mask.squeeze(0)  # Remove any extra channel dimension
+                plt.subplot(1, 3, 2)
+                plt.imshow(mask, cmap='gray')
+                plt.title(f"Task {i+1}, Mask {j+1}")
+                plt.axis('off')
+
+            # Show the label
+            plt.subplot(1, 3, 3)
+            plt.text(0.5, 0.5, f"Label: {labels[i, j]}", fontsize=12, ha='center')
+            plt.title(f"Task {i+1}, Label {j+1}")
+            plt.axis('off')
         
-        plt.savefig('/content/visualize_mask.png')
-        plt.close()
-        print('save fig')
+            plt.savefig(f'/content/visualize_mask_Task {i+1}, Label {j+1}_2.png')
+            plt.close()
+            print('save fig')
 
 
 
@@ -306,7 +312,7 @@ if __name__=='__main__':
         test_few_shot_params     = dict(n_way = params.test_n_way, n_support = params.n_shot) 
 
         base_datamgr = SetDataManager(image_size, n_query = n_query,  **train_few_shot_params)
-        base_loader  = base_datamgr.get_data_loader( base_file , aug = params.train_aug,  sn = params.sn, label_folder='/content/drive/MyDrive/PhD/BreaKHis_40x_masked_labels')
+        base_loader  = base_datamgr.get_data_loader( base_file , aug = params.train_aug,  sn = params.sn, label_folder='/content/drive/MyDrive/PhD/BreaKHis_40x_masked_labels') #'/content/drive/MyDrive/PhD/BreaKHis_40x_masked_labels'
         
         val_datamgr = SetDataManager(image_size, n_query = n_query, **test_few_shot_params)
         val_loader = val_datamgr.get_data_loader( val_file, aug = 'none', sn = params.sn, label_folder='/content/drive/MyDrive/PhD/BreaKHis_40x_masked_labels') 
@@ -403,6 +409,6 @@ if __name__=='__main__':
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
 
-    visualize_batch(base_loader)
-    visualize_batch(val_loader)
-    # model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
+    # visualize_batch(base_loader)
+    # visualize_batch(val_loader)
+    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
