@@ -85,7 +85,11 @@ class SubDataset:
             mask_name = os.path.basename(image_path).replace('.png', '_labels.npy')  # Assuming .jpg format for images
             mask_path = os.path.join(self.label_folder, class_dir, mask_name)  # Add class_dir to mask_path
             mask = np.load(mask_path)
-            mask = torch.from_numpy(mask).long()  # Convert to tensor and appropriate type for segmentation
+            mask = torch.from_numpy(mask).float()  # Convert to tensor
+            mask = mask.unsqueeze(0)  # Add a channel dimension, making it [1, 256, 256]
+            
+            # Step 1: Resize the mask from [256, 256] to [84, 84]
+            mask = F.interpolate(mask.unsqueeze(0), size=(84, 84), mode='bilinear', align_corners=False).squeeze(0)
         else:
             mask = None  # No mask, handle main classification task only
 
