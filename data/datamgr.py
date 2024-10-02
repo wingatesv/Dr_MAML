@@ -135,11 +135,11 @@ class SetDataManager(DataManager):
 
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug, sn, cutmix = False, mixup = False): #parameters that would change on train/val set
+    def get_data_loader(self, data_file, aug, sn, cutmix = False, mixup = False, label_folder=None): #parameters that would change on train/val set
         
 
         transform = self.trans_loader.get_composed_transform(aug = aug, sn=sn)
-        dataset = SetDataset( data_file , self.batch_size, transform = transform)
+        dataset = SetDataset( data_file , self.batch_size, transform = transform, label_folder=label_folder)
         sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide )  
 
       
