@@ -33,7 +33,7 @@ from methods.reptile import Reptile
 import torch.multiprocessing as mp
 from io_utils import model_dict, parse_args, get_resume_file, set_seed
 
-from methods.ppo_maml import PPO_MAML
+from methods.aux_maml import Aux_MAML
 
 
 
@@ -151,6 +151,51 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
         
     return model
 
+def visualize_batch(dataloader):
+    # Get a batch of data from the dataloader
+    data = next(iter(dataloader))
+    
+    # Check if we have masks in the data
+    if len(data) == 3:
+        images, masks, labels = data
+    else:
+        images, labels = data
+        masks = None  # No mask available
+    
+    # Convert images from tensor to numpy for visualization
+    images_np = images.permute(0, 2, 3, 1).numpy()  # Move channels to last dimension for matplotlib
+    labels_np = labels.numpy()
+
+    # Visualize the first few images, masks, and labels in the batch
+    for i in range(min(len(images), 4)):  # Visualize up to 4 examples
+        plt.figure(figsize=(12, 4))
+        
+        # Show the image
+        plt.subplot(1, 3, 1)
+        plt.imshow(images_np[i])
+        plt.title(f"Image {i+1}")
+        plt.axis('off')
+        
+        # If masks are available, show the mask
+        if masks is not None:
+            mask_np = masks[i].numpy()  # Convert the mask to numpy
+            plt.subplot(1, 3, 2)
+            plt.imshow(mask_np, cmap='gray')
+            plt.title(f"Mask {i+1}")
+            plt.axis('off')
+
+        # Show the label
+        plt.subplot(1, 3, 3)
+        plt.text(0.5, 0.5, f"Label: {labels_np[i]}", fontsize=12, ha='center')
+        plt.title(f"Label {i+1}")
+        plt.axis('off')
+        
+        plt.savefig('/content/visualize_mask.png')
+        plt.close()
+        print('save fig')
+
+
+
 if __name__=='__main__':
     mp.set_start_method('spawn')
    
@@ -253,7 +298,7 @@ if __name__=='__main__':
       elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, loss_type = 'dist')
 
-    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
+    elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'aux_maml', 'alfa', 'reptile']:
        
         n_query = max(1, int(16* params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
 
@@ -261,10 +306,10 @@ if __name__=='__main__':
         test_few_shot_params     = dict(n_way = params.test_n_way, n_support = params.n_shot) 
 
         base_datamgr = SetDataManager(image_size, n_query = n_query,  **train_few_shot_params)
-        base_loader  = base_datamgr.get_data_loader( base_file , aug = params.train_aug,  sn = params.sn)
+        base_loader  = base_datamgr.get_data_loader( base_file , aug = params.train_aug,  sn = params.sn, label_folder='/content/drive/MyDrive/PhD/BreaKHis_40x_masked_labels')
         
         val_datamgr = SetDataManager(image_size, n_query = n_query, **test_few_shot_params)
-        val_loader = val_datamgr.get_data_loader( val_file, aug = 'none', sn = params.sn) 
+        val_loader = val_datamgr.get_data_loader( val_file, aug = 'none', sn = params.sn, label_folder='/content/drive/MyDrive/PhD/BreaKHis_40x_masked_labels') 
         #a batch for SetDataManager: a [n_way, n_support + n_query, dim, w, h] tensor  
 
         if params.method == 'protonet':
@@ -283,7 +328,7 @@ if __name__=='__main__':
             model = RelationNet( feature_model, loss_type = loss_type , **train_few_shot_params )
 
 
-        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'ppo_maml', 'alfa', 'reptile']:
+        elif params.method in ['maml' , 'maml_approx', 'anil', 'annemaml', 'xmaml', 'tra_anil', 'aux_maml', 'alfa', 'reptile']:
           backbone.ConvBlock.maml = True
           backbone.SimpleBlock.maml = True
           backbone.BottleneckBlock.maml = True
@@ -292,8 +337,8 @@ if __name__=='__main__':
           if params.method in ['maml', 'maml_approx']:
             model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
 
-          elif params.method == 'ppo_maml':
-            model = PPO_MAML(  model_dict[params.model], approx = False, agent_chkpt_dir = params.checkpoint_dir, **train_few_shot_params )
+          elif params.method == 'aux_maml':
+            model = Aux_MAML(  model_dict[params.model], approx = False, **train_few_shot_params )
 
           elif params.method == 'reptile':
             model = Reptile(  model_dict[params.model], **train_few_shot_params )
@@ -358,5 +403,6 @@ if __name__=='__main__':
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
 
-
-    model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
+    visualize_batch(base_loader)
+    visualize_batch(val_loader)
+    # model = train(base_loader, val_loader,  model, optimization, start_epoch, stop_epoch, params)
