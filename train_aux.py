@@ -117,11 +117,11 @@ def train(base_loader, val_loader, model, optimization, start_epoch, stop_epoch,
                early_stopping_counter += 1
 
         # If validation accuracy hasn't improved for patience epochs, increase patience
-        # if early_stopping_counter >= patience and epoch >= warmup_epochs:
-        #     print(f"Early stopping at epoch {epoch}")
+        if early_stopping_counter >= patience and epoch >= warmup_epochs:
+            print(f"Early stopping at epoch {epoch}")
 
-        #     stop_epoch = epoch
-        #     break
+            stop_epoch = epoch
+            break
 
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
