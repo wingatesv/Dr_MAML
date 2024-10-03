@@ -36,6 +36,7 @@ class Aux_MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
         super(Aux_MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
         self.aux_task = 'sn' #inpainting, segmentation
+        self.segmentation_method = 'otsu' #adaptive, otsu, region_growing
         print('aux_task:', self.aux_task)
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
@@ -170,20 +171,44 @@ class Aux_MAML(MetaTemplate):
         masked_images = images * masks
         return masked_images, masks
 
-    def generate_otsu_mask(self, image_batch):
+    def generate_mask(self, image_batch, method='otsu'):
         batch_size, _, h, w = image_batch.size()
         masks = torch.zeros(batch_size, 1, h, w).cuda()
     
         for i in range(batch_size):
-            # Convert to numpy, grayscale, and apply Otsu's thresholding
+            # Convert to numpy, grayscale
             image_np = image_batch[i].permute(1, 2, 0).cpu().numpy()  # Convert to (H, W, C)
             gray_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+    
+            # Normalize grayscale image to [0, 255] and convert to uint8
             gray_image = cv2.GaussianBlur(gray_image, (5, 5), 0)  # Apply Gaussian Blur
             gray_image_uint8 = cv2.normalize(gray_image, None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
     
-            # Apply Otsu's thresholding
-            _, mask = cv2.threshold(gray_image_uint8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            
+            # Choose the segmentation method based on 'method' argument
+            if method == 'otsu':
+                # Apply Otsu's thresholding
+                _, mask = cv2.threshold(gray_image_uint8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+            elif method == 'adaptive':
+                # Apply Adaptive Thresholding
+                mask = cv2.adaptiveThreshold(gray_image_uint8, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    
+            elif method == 'region_growing':
+                # Apply Region Growing (using a seed point)
+                seed_point = (h // 2, w // 2)  # You can change the seed point based on the image
+                mask = np.zeros_like(gray_image_uint8)
+                threshold = 0.1 * 255  # Adjust threshold to match 8-bit range
+                mask[seed_point] = 1
+                mean_val = gray_image_uint8[seed_point]
+                for x in range(gray_image_uint8.shape[0]):
+                    for y in range(gray_image_uint8.shape[1]):
+                        if abs(gray_image_uint8[x, y] - mean_val) < threshold:
+                            mask[x, y] = 1
+                mask = mask.astype(np.uint8) * 255
+    
+            else:
+                raise ValueError(f"Unsupported method: {method}. Choose 'otsu', 'adaptive', or 'region_growing'.")
+    
             # Convert back to tensor and normalize mask values to 0 and 1
             mask = torch.from_numpy(mask).float().unsqueeze(0) / 255.0
             masks[i] = mask
@@ -209,7 +234,7 @@ class Aux_MAML(MetaTemplate):
             masked_images, masks = self.random_block_mask(x_a_i)
         elif self.aux_task == 'segmentation':
             #  Generate segmentation masks using Otsu's method
-            tissue_masks = self.generate_otsu_mask(x_a_i)  # Generates binary masks for support data
+            tissue_masks = self.generate_mask(x_a_i, method = self.segmentation_method)  # Generates binary masks for support data
         
         fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
         for weight in self.parameters():
