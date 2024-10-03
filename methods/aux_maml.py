@@ -194,17 +194,23 @@ class Aux_MAML(MetaTemplate):
                 mask = cv2.adaptiveThreshold(gray_image_uint8, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
     
             elif method == 'region_growing':
+                # Convert gray_image_uint8 to a signed type to prevent overflow
+                gray_image_int16 = gray_image_uint8.astype(np.int16)
+                
                 # Apply Region Growing (using a seed point)
                 seed_point = (h // 2, w // 2)  # You can change the seed point based on the image
                 mask = np.zeros_like(gray_image_uint8)
                 threshold = 0.1 * 255  # Adjust threshold to match 8-bit range
                 mask[seed_point] = 1
-                mean_val = gray_image_uint8[seed_point]
-                for x in range(gray_image_uint8.shape[0]):
-                    for y in range(gray_image_uint8.shape[1]):
-                        if abs(gray_image_uint8[x, y] - mean_val) < threshold:
+                mean_val = gray_image_int16[seed_point]
+                
+                # Region growing loop using int16 to prevent overflow
+                for x in range(gray_image_int16.shape[0]):
+                    for y in range(gray_image_int16.shape[1]):
+                        if abs(gray_image_int16[x, y] - mean_val) < threshold:
                             mask[x, y] = 1
-                mask = mask.astype(np.uint8) * 255
+                            
+                mask = mask.astype(np.uint8) * 255  # Convert back to uint8 after processing
     
             else:
                 raise ValueError(f"Unsupported method: {method}. Choose 'otsu', 'adaptive', or 'region_growing'.")
