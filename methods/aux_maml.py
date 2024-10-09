@@ -56,14 +56,14 @@ class Aux_MAML(MetaTemplate):
         self.val_loss = 0
         self.current_epoch = 0
 
-        if self.aux_task == 'sn':
+        if self.aux_task in ['sn', 'sn_inpainting']:
             # Initialize the StainNet model
             STAINNET_WEIGHTS = '/content/Dr_MAML/data/StainNet-Public-centerUni_layer3_ch32.pth'
             self.stainnet_model = StainNet().cuda()
             self.stainnet_model.load_state_dict(torch.load(STAINNET_WEIGHTS, weights_only=True))
             self.stainnet_model.eval()  # Set the model to evaluation mode
 
-        output_channels = 3 if self.aux_task in ['inpainting', 'sn'] else 1
+        output_channels = 3 if self.aux_task in ['inpainting', 'sn', 'sn_inpainting'] else 1
         print(output_channels)
         self.inpainting_head = backbone.InpaintingHead(input_channels=64, output_channels=output_channels)
          # Store metrics for plotting
@@ -288,8 +288,18 @@ class Aux_MAML(MetaTemplate):
                 features = self.feature(masked_images)
                 reconstructed_images = self.inpainting_head(features)
     
-               # Compute auxiliary loss as the difference between reconstructed images and stain-normalized images
+                # Compute auxiliary loss as the difference between reconstructed images and stain-normalized images
                 aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
+
+                # Compute a weighted loss
+                # mask_weight = 1.0  # Weight for masked regions
+                # unmask_weight = 0.1  # Weight for unmasked regions
+                
+                # loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
+                # loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
+                
+                # aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
+
                 
             
     
