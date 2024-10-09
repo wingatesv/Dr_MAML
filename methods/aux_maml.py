@@ -35,7 +35,7 @@ class StainNet(nn.Module):
 class Aux_MAML(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
         super(Aux_MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
-        self.aux_task = 'sn' #inpainting, segmentation
+        self.aux_task = 'sn' #inpainting, segmentation, sn_inpainting
         self.segmentation_method = 'otsu' #adaptive, otsu, region_growing
         print('aux_task:', self.aux_task)
         self.feature = backbone.ConvNet(4, flatten=False)
@@ -241,6 +241,14 @@ class Aux_MAML(MetaTemplate):
         elif self.aux_task == 'segmentation':
             #  Generate segmentation masks using Otsu's method
             tissue_masks = self.generate_mask(x_a_i, method = self.segmentation_method)  # Generates binary masks for support data
+            
+        elif self.aux_task == 'sn_inpainting':
+            # Generate stain-normalized images for the support data
+            with torch.no_grad():
+                stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
+
+            # Generate masked images and masks for the inpainting task
+            masked_images, masks = self.random_block_mask(stain_normalized_images)
         
         fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
         for weight in self.parameters():
@@ -249,6 +257,7 @@ class Aux_MAML(MetaTemplate):
 
 
         for task_step in range(self.task_update_num): 
+            
             scores = self.forward(x_a_i)
             set_loss_cls = self.loss_fn( scores, y_a_i) 
 
@@ -272,6 +281,16 @@ class Aux_MAML(MetaTemplate):
                 predicted_masks = self.inpainting_head(features)
                 # Compute inpainting loss on masked regions
                 aux_loss = nn.BCELoss()(predicted_masks, tissue_masks)  # Binary cross-entropy loss
+
+            elif self.aux_task == 'sn_inpainting':
+
+                # Inpainting forward pass
+                features = self.feature(masked_images)
+                reconstructed_images = self.inpainting_head(features)
+    
+               # Compute auxiliary loss as the difference between reconstructed images and stain-normalized images
+                aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
+                
             
     
             # Total loss
