@@ -289,16 +289,16 @@ class Aux_MAML(MetaTemplate):
                 reconstructed_images = self.inpainting_head(features)
     
                 # Compute auxiliary loss as the difference between reconstructed images and stain-normalized images
-                aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
+                # aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
 
                 # Compute a weighted loss
-                # mask_weight = 1.0  # Weight for masked regions
-                # unmask_weight = 0.1  # Weight for unmasked regions
+                mask_weight = 0.5  # Weight for masked regions
+                unmask_weight = 0.5  # Weight for unmasked regions
                 
-                # loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
-                # loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
+                loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
+                loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
                 
-                # aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
+                aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
 
                 
             
