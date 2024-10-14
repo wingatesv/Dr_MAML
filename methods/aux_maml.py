@@ -339,7 +339,7 @@ class Aux_MAML(MetaTemplate):
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
             fast_parameters = []
             if self.aux_task == 'sn_inpainting':
-                 for k, weight in enumerate([p for p in self.parameters() if p is not self.mask_weight_param]):
+                 for k, weight in enumerate([p for p in self.parameters() if p is not self.log_sigma_mask and p is not self.log_sigma_unmask ]):
                     #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                     if weight.fast is None:
                         weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
