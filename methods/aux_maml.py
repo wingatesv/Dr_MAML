@@ -63,7 +63,7 @@ class Aux_MAML(MetaTemplate):
 
             # self.log_sigma_mask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
             # self.log_sigma_unmask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
-            continue
+            pass
             
 
         if self.aux_task in ['sn', 'sn_inpainting']:
