@@ -161,7 +161,7 @@ class Aux_MAML(MetaTemplate):
       normalized_images = (normalized_images + 1) / 2
 
       # Re-apply the normalization
-      normalized_images = self.normalize(normalized_images, mean, std)
+      #normalized_images = self.normalize(normalized_images, mean, std)
   
       # Ensure the output has the same shape as the input
       assert normalized_images.shape == images.shape, \
@@ -318,8 +318,25 @@ class Aux_MAML(MetaTemplate):
                 # loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
                 # loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
                 # ssim loss
-                loss_masked = 1 - piq.ssim(reconstructed_images * masks, stain_normalized_images * masks, data_range=1.0)
-                loss_unmasked = 1 - piq.ssim(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks), data_range=1.0)
+                reconstructed_images = torch.clamp(reconstructed_images, 0.0, 1.0)
+                stain_normalized_images = torch.clamp(stain_normalized_images, 0.0, 1.0)
+
+                # Set data_range to 1.0
+                data_range = 1.0
+
+                # Compute SSIM loss
+                loss_masked = 1 - piq.ssim(
+                    reconstructed_images * masks, 
+                    stain_normalized_images * masks, 
+                    data_range=data_range
+                )
+
+                loss_unmasked = 1 - piq.ssim(
+                    reconstructed_images * (1 - masks), 
+                    stain_normalized_images * (1 - masks), 
+                    data_range=data_range
+                )
+
 
                 aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
 
