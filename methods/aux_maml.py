@@ -12,7 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import random
 import cv2
-
+import piq
 
 
 class StainNet(nn.Module):
@@ -61,8 +61,9 @@ class Aux_MAML(MetaTemplate):
             # initial_param_value = torch.logit(torch.tensor(initial_mask_weight))
             # self.mask_weight_param = nn.Parameter(initial_param_value, requires_grad=True)
 
-            self.log_sigma_mask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
-            self.log_sigma_unmask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
+            # self.log_sigma_mask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
+            # self.log_sigma_unmask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
+            continue
             
 
         if self.aux_task in ['sn', 'sn_inpainting']:
@@ -261,11 +262,11 @@ class Aux_MAML(MetaTemplate):
             # Generate masked images and masks for the inpainting task
             masked_images, masks = self.random_block_mask(stain_normalized_images)
 
-        if self.aux_task == 'sn_inpainting':
-            # fast_parameters = [p for p in self.parameters() if p is not self.mask_weight_param]
-            fast_parameters = [p for p in self.parameters() if p is not  self.log_sigma_mask and p is not self.log_sigma_unmask ]
-        else:
-            fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
+        # if self.aux_task == 'sn_inpainting':
+        #     # fast_parameters = [p for p in self.parameters() if p is not self.mask_weight_param]
+        #     fast_parameters = [p for p in self.parameters() if p is not  self.log_sigma_mask and p is not self.log_sigma_unmask ]
+        # else:
+        fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
         for weight in self.parameters():
             weight.fast = None
         self.zero_grad()
@@ -307,24 +308,28 @@ class Aux_MAML(MetaTemplate):
                 # aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
 
                 # Compute a weighted loss
-                # mask_weight = 0.5  # Weight for masked regions
-                # unmask_weight = 0.5  # Weight for unmasked regions
+                mask_weight = 0.5  # Weight for masked regions
+                unmask_weight = 0.5  # Weight for unmasked regions
 
                 # Compute mask_weight using sigmoid to constrain between 0 and 1
                 # mask_weight = torch.sigmoid(self.mask_weight_param)
                 # unmask_weight = 1.0 - mask_weight
                 
-                loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
-                loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
-                # aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
+                # loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
+                # loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
+                # ssim loss
+                loss_masked = 1 - piq.ssim(reconstructed_images * masks, stain_normalized_images * masks, data_range=1.0)
+                loss_unmasked = 1 - piq.ssim(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks), data_range=1.0)
+
+                aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
 
                 # Compute weights based on log variances
-                self.weight_mask = 1 / (2 * torch.exp(self.log_sigma_mask))
-                self.weight_unmask = 1 / (2 * torch.exp(self.log_sigma_unmask))
+                # self.weight_mask = 1 / (2 * torch.exp(self.log_sigma_mask))
+                # self.weight_unmask = 1 / (2 * torch.exp(self.log_sigma_unmask))
 
-                aux_loss = self.weight_mask * loss_masked + self.weight_unmask * loss_unmasked
-                # Add the log variance terms to the loss (as per Kendall et al. 2018)
-                aux_loss += self.log_sigma_mask + self.log_sigma_unmask
+                # aux_loss = self.weight_mask * loss_masked + self.weight_unmask * loss_unmasked
+                # # Add the log variance terms to the loss (as per Kendall et al. 2018)
+                # aux_loss += self.log_sigma_mask + self.log_sigma_unmask
                 
                 
 
@@ -338,23 +343,23 @@ class Aux_MAML(MetaTemplate):
             if self.approx:
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
             fast_parameters = []
-            if self.aux_task == 'sn_inpainting':
-                 for k, weight in enumerate([p for p in self.parameters() if p is not self.log_sigma_mask and p is not self.log_sigma_unmask ]):
-                    #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                    if weight.fast is None:
-                        weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
-                    else:
-                        weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
-                    fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
+            # if self.aux_task == 'sn_inpainting':
+            #      for k, weight in enumerate([p for p in self.parameters() if p is not self.log_sigma_mask and p is not self.log_sigma_unmask ]):
+            #         #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+            #         if weight.fast is None:
+            #             weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
+            #         else:
+            #             weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+            #         fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
 
-            else:
-                for k, weight in enumerate(self.parameters()):
-                    #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                    if weight.fast is None:
-                        weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
-                    else:
-                        weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
-                    fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
+            # else:
+            for k, weight in enumerate(self.parameters()):
+                #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+                if weight.fast is None:
+                    weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
+                else:
+                    weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+                fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
 
 
         # feed forward query data
@@ -429,12 +434,12 @@ class Aux_MAML(MetaTemplate):
                 loss_all = []
             optimizer.zero_grad()
             if i % print_freq==0:
-                # print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
+                print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
 
                 # mask_weight = torch.sigmoid(self.mask_weight_param).item()
                 # unmask_weight = 1.0 - mask_weight
-                print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / (i + 1):.4f} | '
-                      f'Mask Weight: {self.weight_mask:.4f} | Unmask Weight: {self.weight_unmask:.4f}')
+                # print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / (i + 1):.4f} | '
+                #       f'Mask Weight: {self.weight_mask:.4f} | Unmask Weight: {self.weight_unmask:.4f}')
                 
         self.train_loss = avg_loss/len(train_loader)
         self.train_confidence = sum(all_confidences) / len(all_confidences)
