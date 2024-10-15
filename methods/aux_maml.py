@@ -14,6 +14,8 @@ import random
 import cv2
 import piq
 
+from methods.perpetual_loss import PerceptualLoss
+
 
 class StainNet(nn.Module):
     def __init__(self, input_nc=3, output_nc=3, n_layer=3, n_channel=32, kernel_size=1):
@@ -347,6 +349,9 @@ class Aux_MAML(MetaTemplate):
                 # aux_loss = self.weight_mask * loss_masked + self.weight_unmask * loss_unmasked
                 # # Add the log variance terms to the loss (as per Kendall et al. 2018)
                 # aux_loss += self.log_sigma_mask + self.log_sigma_unmask
+                # make sure the stain normalization function is uncommented
+                # Compute Perceptual Loss
+                # aux_loss = perceptual_loss_fn(reconstructed_images, stain_normalized_images)
                 
                 
 
