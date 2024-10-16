@@ -12,7 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import random
 import cv2
-import piq
+# import piq
 
 from methods.perpetual_loss import PerceptualLoss
 
@@ -273,6 +273,7 @@ class Aux_MAML(MetaTemplate):
             weight.fast = None
         self.zero_grad()
 
+        perceptual_loss_fn = PerceptualLoss().cuda()
 
         for task_step in range(self.task_update_num): 
             
