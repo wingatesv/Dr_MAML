@@ -16,26 +16,26 @@ import piq
 
 
 
-class CombinedLoss(nn.Module):
-    def __init__(self, alpha=0.5):
-        """
-        Initialize the combined loss function.
-        :param alpha: Weight for MSE and SSIM loss. alpha=0.5 gives equal weight to both losses.
-        """
-        super(CombinedLoss, self).__init__()
-        self.alpha = alpha  # Alpha is the weight for MSE and SSIM loss
+# class CombinedLoss(nn.Module):
+#     def __init__(self, alpha=0.5):
+#         """
+#         Initialize the combined loss function.
+#         :param alpha: Weight for MSE and SSIM loss. alpha=0.5 gives equal weight to both losses.
+#         """
+#         super(CombinedLoss, self).__init__()
+#         self.alpha = alpha  # Alpha is the weight for MSE and SSIM loss
 
-    def forward(self, reconstructed_images, target_images):
-        # Compute MSE loss (pixel-wise loss)
-        mse_loss = F.mse_loss(reconstructed_images, target_images)
+#     def forward(self, reconstructed_images, target_images):
+#         # Compute MSE loss (pixel-wise loss)
+#         mse_loss = F.mse_loss(reconstructed_images, target_images)
 
-        # Compute SSIM loss (structural similarity loss)
-        ssim_loss = 1 - piq.ssim(reconstructed_images, target_images, data_range=1.0)
+#         # Compute SSIM loss (structural similarity loss)
+#         ssim_loss = 1 - piq.ssim(reconstructed_images, target_images, data_range=1.0)
 
-        # Combine MSE and SSIM loss with weight alpha
-        combined_loss = self.alpha * mse_loss + (1 - self.alpha) * ssim_loss
+#         # Combine MSE and SSIM loss with weight alpha
+#         combined_loss = self.alpha * mse_loss + (1 - self.alpha) * ssim_loss
 
-        return combined_loss
+#         return combined_loss
 
 
 class StainNet(nn.Module):
@@ -295,7 +295,7 @@ class Aux_MAML(MetaTemplate):
         self.zero_grad()
 
         # Initialize the combined MSE + SSIM loss
-        combined_loss_fn = CombinedLoss(alpha=0.5).cuda()
+        # combined_loss_fn = CombinedLoss(alpha=0.5).cuda()
 
         for task_step in range(self.task_update_num): 
             
@@ -333,8 +333,8 @@ class Aux_MAML(MetaTemplate):
                 # aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
 
                 # Compute a weighted loss
-                # mask_weight = 0.5  # Weight for masked regions
-                # unmask_weight = 0.5  # Weight for unmasked regions
+                mask_weight = 0.5  # Weight for masked regions
+                unmask_weight = 0.5  # Weight for unmasked regions
 
                 # Compute mask_weight using sigmoid to constrain between 0 and 1
                 # mask_weight = torch.sigmoid(self.mask_weight_param)
@@ -346,27 +346,27 @@ class Aux_MAML(MetaTemplate):
                 reconstructed_images = torch.clamp(reconstructed_images, 0.0, 1.0)
                 stain_normalized_images = torch.clamp(stain_normalized_images, 0.0, 1.0)
 
-                aux_loss = combined_loss_fn(reconstructed_images, stain_normalized_images)
+                # aux_loss = combined_loss_fn(reconstructed_images, stain_normalized_images)
 
 
                 # Set data_range to 1.0
-                # data_range = 1.0
+                data_range = 1.0
 
                 # # Compute SSIM loss
-                # loss_masked = 1 - piq.ssim(
-                #     reconstructed_images * masks, 
-                #     stain_normalized_images * masks, 
-                #     data_range=data_range
-                # )
+                loss_masked = 1 - piq.ms_ssim(
+                    reconstructed_images * masks, 
+                    stain_normalized_images * masks, 
+                    data_range=data_range
+                )
 
-                # loss_unmasked = 1 - piq.ssim(
-                #     reconstructed_images * (1 - masks), 
-                #     stain_normalized_images * (1 - masks), 
-                #     data_range=data_range
-                # )
+                loss_unmasked = 1 - piq.ms_ssim(
+                    reconstructed_images * (1 - masks), 
+                    stain_normalized_images * (1 - masks), 
+                    data_range=data_range
+                )
 
 
-                # aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
+                aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
 
                 # Compute weights based on log variances
                 # self.weight_mask = 1 / (2 * torch.exp(self.log_sigma_mask))
