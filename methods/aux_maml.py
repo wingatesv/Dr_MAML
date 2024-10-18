@@ -333,7 +333,7 @@ class Aux_MAML(MetaTemplate):
                 # aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
 
                 # Compute a weighted loss
-                mask_weight = 0.5  # Weight for masked regions
+                mask_weight = 0.8  # Weight for masked regions
                 unmask_weight = 0.5  # Weight for unmasked regions
 
                 # Compute mask_weight using sigmoid to constrain between 0 and 1
