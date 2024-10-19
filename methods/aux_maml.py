@@ -16,26 +16,40 @@ import piq
 
 
 
-# class CombinedLoss(nn.Module):
-#     def __init__(self, alpha=0.5):
-#         """
-#         Initialize the combined loss function.
-#         :param alpha: Weight for MSE and SSIM loss. alpha=0.5 gives equal weight to both losses.
-#         """
-#         super(CombinedLoss, self).__init__()
-#         self.alpha = alpha  # Alpha is the weight for MSE and SSIM loss
+class CombinedLoss(nn.Module):
+    def __init__(self, alpha=0.5, mask_weight=0.5, unmask_weight=0.5):
+        """
+        Initialize the combined loss function.
+        :param alpha: Weight for MSE and SSIM loss. alpha=0.5 gives equal weight to both losses.
+        :param mask_weight: Weight for the masked region.
+        :param unmask_weight: Weight for the unmasked region.
+        """
+        super(CombinedLoss, self).__init__()
+        self.alpha = alpha  # Alpha is the weight for MSE and SSIM loss
+        self.mask_weight = mask_weight
+        self.unmask_weight = unmask_weight
 
-#     def forward(self, reconstructed_images, target_images):
-#         # Compute MSE loss (pixel-wise loss)
-#         mse_loss = F.mse_loss(reconstructed_images, target_images)
+    def forward(self, reconstructed_images, target_images, masks):
+        # Ensure images are clamped between 0 and 1
+        reconstructed_images = torch.clamp(reconstructed_images, 0.0, 1.0)
+        target_images = torch.clamp(target_images, 0.0, 1.0)
 
-#         # Compute SSIM loss (structural similarity loss)
-#         ssim_loss = 1 - piq.ssim(reconstructed_images, target_images, data_range=1.0)
+        # Compute MSE loss for masked and unmasked regions
+        mse_loss_masked = F.mse_loss(reconstructed_images * masks, target_images * masks)
+        mse_loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), target_images * (1 - masks))
 
-#         # Combine MSE and SSIM loss with weight alpha
-#         combined_loss = self.alpha * mse_loss + (1 - self.alpha) * ssim_loss
+        # Compute SSIM loss for masked and unmasked regions
+        ssim_loss_masked = 1 - piq.ssim(reconstructed_images * masks, target_images * masks, data_range=1.0)
+        ssim_loss_unmasked = 1 - piq.ssim(reconstructed_images * (1 - masks), target_images * (1 - masks), data_range=1.0)
 
-#         return combined_loss
+        # Combined MSE and SSIM loss for masked and unmasked regions
+        combined_loss_masked = self.alpha * mse_loss_masked + (1 - self.alpha) * ssim_loss_masked
+        combined_loss_unmasked = self.alpha * mse_loss_unmasked + (1 - self.alpha) * ssim_loss_unmasked
+
+        # Apply mask and unmask weights
+        final_loss = self.mask_weight * combined_loss_masked + self.unmask_weight * combined_loss_unmasked
+
+        return final_loss
 
 
 class StainNet(nn.Module):
@@ -63,6 +77,7 @@ class Aux_MAML(MetaTemplate):
         print('aux_task:', self.aux_task)
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
+        self.aux_loss_fn = CombinedLoss(alpha=0.5, mask_weight=0.5, unmask_weight=0.5)
 
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
@@ -328,45 +343,47 @@ class Aux_MAML(MetaTemplate):
                 # Inpainting forward pass
                 features = self.feature(masked_images)
                 reconstructed_images = self.inpainting_head(features)
+
+                aux_loss = self.aux_loss_fn(reconstructed_images, stain_normalized_images, masks)
     
                 # Compute auxiliary loss as the difference between reconstructed images and stain-normalized images
                 # aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
 
                 # Compute a weighted loss
-                mask_weight = 0.8  # Weight for masked regions
-                unmask_weight = 0.5  # Weight for unmasked regions
+                # mask_weight = 0.8  # Weight for masked regions
+                # unmask_weight = 0.5  # Weight for unmasked regions
 
-                # Compute mask_weight using sigmoid to constrain between 0 and 1
-                # mask_weight = torch.sigmoid(self.mask_weight_param)
-                # unmask_weight = 1.0 - mask_weight
+                # # Compute mask_weight using sigmoid to constrain between 0 and 1
+                # # mask_weight = torch.sigmoid(self.mask_weight_param)
+                # # unmask_weight = 1.0 - mask_weight
                 
-                # loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
-                # loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
-                # ssim loss
-                reconstructed_images = torch.clamp(reconstructed_images, 0.0, 1.0)
-                stain_normalized_images = torch.clamp(stain_normalized_images, 0.0, 1.0)
+                # # loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
+                # # loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
+                # # ssim loss
+                # reconstructed_images = torch.clamp(reconstructed_images, 0.0, 1.0)
+                # stain_normalized_images = torch.clamp(stain_normalized_images, 0.0, 1.0)
 
-                # aux_loss = combined_loss_fn(reconstructed_images, stain_normalized_images)
-
-
-                # Set data_range to 1.0
-                data_range = 1.0
-
-                # # Compute SSIM loss
-                loss_masked = 1 - piq.ms_ssim(
-                    reconstructed_images * masks, 
-                    stain_normalized_images * masks, 
-                    data_range=data_range
-                )
-
-                loss_unmasked = 1 - piq.ms_ssim(
-                    reconstructed_images * (1 - masks), 
-                    stain_normalized_images * (1 - masks), 
-                    data_range=data_range
-                )
+                # # aux_loss = combined_loss_fn(reconstructed_images, stain_normalized_images)
 
 
-                aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
+                # # Set data_range to 1.0
+                # data_range = 1.0
+
+                # # # Compute SSIM loss
+                # loss_masked = 1 - piq.ssim(
+                #     reconstructed_images * masks, 
+                #     stain_normalized_images * masks, 
+                #     data_range=data_range
+                # )
+
+                # loss_unmasked = 1 - piq.ssim(
+                #     reconstructed_images * (1 - masks), 
+                #     stain_normalized_images * (1 - masks), 
+                #     data_range=data_range
+                # )
+
+
+                # aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
 
                 # Compute weights based on log variances
                 # self.weight_mask = 1 / (2 * torch.exp(self.log_sigma_mask))
