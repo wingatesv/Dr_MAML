@@ -99,7 +99,7 @@ class Aux_MAML(MetaTemplate):
         self.val_loss = 0
         self.current_epoch = 0
 
-        self.init_optimizer()
+        
 
   
 
@@ -136,6 +136,8 @@ class Aux_MAML(MetaTemplate):
             'confidence': [],
             'entropy': [],
         }
+
+        self.init_optimizer()
 
     def init_optimizer(self):
         # Exclude stainnet_model parameters
