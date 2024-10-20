@@ -334,7 +334,7 @@ class Aux_MAML(MetaTemplate):
             # fast_parameters = [p for p in self.parameters() if p is not self.mask_weight_param]
             # fast_parameters = [p for p in self.parameters() if p is not  self.log_sigma_mask and p is not self.log_sigma_unmask ]
              aux_loss_params = set(self.aux_loss_fn.parameters())
-             fast_parameters = [p for p in self.parameters() if p not in aux_loss_params)]
+             fast_parameters = [p for p in self.parameters() if p not in aux_loss_params]
         else:
             fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
         for weight in self.parameters():
