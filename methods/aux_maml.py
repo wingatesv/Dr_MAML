@@ -153,7 +153,7 @@ class Aux_MAML(MetaTemplate):
 
         # Initialize the optimizer with parameter groups
         self.optimizer = torch.optim.Adam([
-            {'params': main_params, 'lr': 0.001},
+            {'params': main_params, 'lr': 0.0001},
             {'params': aux_params, 'lr': 0.001}
         ])
     def parameters(self):
