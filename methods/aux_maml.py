@@ -46,6 +46,7 @@ class CombinedLoss(nn.Module):
 
         # Get alpha between 0 and 1 using sigmoid
         alpha = torch.sigmoid(self.logit_alpha)
+        print('alpha weight:', alpha)
 
         # Combined MSE and SSIM loss for masked and unmasked regions
         combined_loss_masked = alpha * mse_loss_masked + (1 - alpha) * ssim_loss_masked
