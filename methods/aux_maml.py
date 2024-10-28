@@ -17,7 +17,7 @@ import piq
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, initial_alpha=0.5, mask_weight=0.5, unmask_weight=0.5):
+    def __init__(self, initial_alpha=0.8, mask_weight=0.5, unmask_weight=0.5):
         """
         Initialize the combined loss function.
         :param initial_alpha: Initial weight for MSE and SSIM loss.
@@ -157,7 +157,7 @@ class Aux_MAML(MetaTemplate):
         # Initialize the optimizer with parameter groups
         self.optimizer = torch.optim.Adam([
             {'params': main_params, 'lr': 0.0001},
-            {'params': aux_params, 'lr': 0.001}
+            {'params': aux_params, 'lr': 0.01}
         ])
     def parameters(self):
         # Override the parameters method to exclude StainNet's parameters
