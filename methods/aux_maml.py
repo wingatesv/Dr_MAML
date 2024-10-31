@@ -28,8 +28,8 @@ class CombinedLoss(nn.Module):
         # Initialize logit_alpha such that sigmoid(logit_alpha) = initial_alpha
         initial_logit_alpha = torch.log(torch.tensor(initial_alpha / (1 - initial_alpha)))
         self.logit_alpha = nn.Parameter(initial_logit_alpha)
-        self.mask_weight = mask_weight
-        self.unmask_weight = unmask_weight
+        self.mask_weight = nn.Parameter(torch.tensor(mask_weight))
+        self.unmask_weight = nn.Parameter(torch.tensor(unmask_weight))
 
     def forward(self, reconstructed_images, target_images, masks):
         # Ensure images are clamped between 0 and 1
