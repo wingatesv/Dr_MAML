@@ -34,9 +34,6 @@ class CombinedLoss(nn.Module):
         self.log_sigma_unmask = nn.Parameter(torch.tensor(initial_log_sigma_unmask))
 
 
-        self.initial_alpha = initial_alpha
-        self.mask_weight = mask_weight
-        self.unmask_weight = unmask_weight
 
 
     def forward(self, reconstructed_images, target_images, masks):
