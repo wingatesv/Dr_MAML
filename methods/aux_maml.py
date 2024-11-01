@@ -17,7 +17,7 @@ import piq
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, initial_alpha=0.5, mask_weight=0.5, unmask_weight=0.5):
+    def __init__(self, initial_alpha=0.5, initial_log_sigma_mask=0.0, initial_log_sigma_unmask=0.0):
         """
         Initialize the combined loss function.
         :param initial_alpha: Initial weight for MSE and SSIM loss.
@@ -28,8 +28,16 @@ class CombinedLoss(nn.Module):
         # Initialize logit_alpha such that sigmoid(logit_alpha) = initial_alpha
         initial_logit_alpha = torch.log(torch.tensor(initial_alpha / (1 - initial_alpha)))
         self.logit_alpha = nn.Parameter(initial_logit_alpha)
-        self.mask_weight = nn.Parameter(torch.tensor(mask_weight))
-        self.unmask_weight = nn.Parameter(torch.tensor(unmask_weight))
+        # self.mask_weight = nn.Parameter(torch.tensor(mask_weight))
+        # self.unmask_weight = nn.Parameter(torch.tensor(unmask_weight))
+        self.log_sigma_mask = nn.Parameter(torch.tensor(initial_log_sigma_mask))
+        self.log_sigma_unmask = nn.Parameter(torch.tensor(initial_log_sigma_unmask))
+
+
+        self.initial_alpha = initial_alpha
+        self.mask_weight = mask_weight
+        self.unmask_weight = unmask_weight
+
 
     def forward(self, reconstructed_images, target_images, masks):
         # Ensure images are clamped between 0 and 1
@@ -53,7 +61,19 @@ class CombinedLoss(nn.Module):
         combined_loss_unmasked = alpha * mse_loss_unmasked + (1 - alpha) * ssim_loss_unmasked
 
         # Apply mask and unmask weights
-        final_loss = self.mask_weight * combined_loss_masked + self.unmask_weight * combined_loss_unmasked
+        # final_loss = self.mask_weight * combined_loss_masked + self.unmask_weight * combined_loss_unmasked
+
+        # Compute uncertainty-based weighting
+        # sigma_mask = exp(log_sigma_mask), sigma_unmask = exp(log_sigma_unmask)
+        precision_mask = torch.exp(-self.log_sigma_mask)
+        precision_unmask = torch.exp(-self.log_sigma_unmask)
+
+        # Weighted losses with uncertainty
+        loss_masked = precision_mask * combined_loss_masked + self.log_sigma_mask
+        loss_unmasked = precision_unmask * combined_loss_unmasked + self.log_sigma_unmask
+
+        # Total loss
+        final_loss = loss_masked + loss_unmasked
 
         return final_loss
 
@@ -83,7 +103,8 @@ class Aux_MAML(MetaTemplate):
         print('aux_task:', self.aux_task)
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
-        self.aux_loss_fn = CombinedLoss(initial_alpha=0.5, mask_weight=0.5, unmask_weight=0.5)
+        # self.aux_loss_fn = CombinedLoss(initial_alpha=0.5, mask_weight=0.5, unmask_weight=0.5)
+        self.aux_loss_fn = CombinedLoss(initial_alpha=0.5, initial_log_sigma_mask=0.0, initial_log_sigma_unmask=0.0).cuda()
 
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
@@ -152,13 +173,23 @@ class Aux_MAML(MetaTemplate):
                        if p.requires_grad and p not in stainnet_params and p not in aux_loss_params]
 
         # Collect aux_loss_fn parameters
-        aux_params = [p for p in aux_loss_params if p.requires_grad]
+        # aux_params = [p for p in aux_loss_params if p.requires_grad]
+
+        # # Initialize the optimizer with parameter groups
+        # self.optimizer = torch.optim.Adam([
+        #     {'params': main_params, 'lr': 0.0001},
+        #     {'params': aux_params, 'lr': 0.05}
+        # ])
+
+        # Include hyperparameters from CombinedLoss
+        hyperparams = list(self.aux_loss_fn.parameters())
 
         # Initialize the optimizer with parameter groups
         self.optimizer = torch.optim.Adam([
             {'params': main_params, 'lr': 0.0001},
-            {'params': aux_params, 'lr': 0.05}
+            {'params': hyperparams, 'lr': 0.05}  # Higher LR for hyperparameters
         ])
+
     def parameters(self):
         # Override the parameters method to exclude StainNet's parameters
         return (param for name, param in self.named_parameters() if not name.startswith('stainnet_model'))
@@ -336,8 +367,13 @@ class Aux_MAML(MetaTemplate):
         if self.aux_task == 'sn_inpainting':
             # fast_parameters = [p for p in self.parameters() if p is not self.mask_weight_param]
             # fast_parameters = [p for p in self.parameters() if p is not  self.log_sigma_mask and p is not self.log_sigma_unmask ]
-             aux_loss_params = set(self.aux_loss_fn.parameters())
-             fast_parameters = [p for p in self.parameters() if p not in aux_loss_params]
+             # aux_loss_params = set(self.aux_loss_fn.parameters())
+             # fast_parameters = [p for p in self.parameters() if p not in aux_loss_params]
+
+             # Collect fast_parameters excluding uncertainty parameters
+            uncertainty_params = set(self.aux_loss_fn.parameters())
+            fast_parameters = [p for p in self.parameters() if p not in uncertainty_params]
+
         else:
             fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
         for weight in self.parameters():
@@ -445,8 +481,9 @@ class Aux_MAML(MetaTemplate):
             fast_parameters = []
             if self.aux_task == 'sn_inpainting':
                  # for k, weight in enumerate([p for p in self.parameters() if p is not self.log_sigma_mask and p is not self.log_sigma_unmask ]):
-                aux_loss_params = set(self.aux_loss_fn.parameters())
-                for k, weight in enumerate([p for p in self.parameters() if p not in aux_loss_params]):
+                # aux_loss_params = set(self.aux_loss_fn.parameters())
+                # for k, weight in enumerate([p for p in self.parameters() if p not in aux_loss_params]):
+                for k, weight in enumerate([p for p in self.parameters() if p not in uncertainty_params]):
                     #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                     if weight.fast is None:
                         weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
@@ -542,6 +579,10 @@ class Aux_MAML(MetaTemplate):
                 # unmask_weight = 1.0 - mask_weight
                 # print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / (i + 1):.4f} | '
                 #       f'Mask Weight: {self.weight_mask:.4f} | Unmask Weight: {self.weight_unmask:.4f}')
+                alpha = torch.sigmoid(self.aux_loss_fn.logit_alpha).item()
+                sigma_mask = torch.exp(self.aux_loss_fn.log_sigma_mask).item()
+                sigma_unmask = torch.exp(self.aux_loss_fn.log_sigma_unmask).item()
+                print(f'Epoch {epoch} | Alpha: {alpha:.4f} | Sigma Mask: {sigma_mask:.4f} | Sigma Unmask: {sigma_unmask:.4f}')
                 
         self.train_loss = avg_loss/len(train_loader)
         self.train_confidence = sum(all_confidences) / len(all_confidences)
