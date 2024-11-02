@@ -29,7 +29,7 @@ class CombinedLoss(nn.Module):
         initial_logit_alpha = torch.log(torch.tensor(initial_alpha / (1 - initial_alpha)))
         self.logit_alpha = nn.Parameter(initial_logit_alpha)
         self.mask_weight = mask_weight
-        self.unmask_weight = unmasked_weight
+        self.unmask_weight = unmask_weight
 
 
 
