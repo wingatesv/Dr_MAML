@@ -17,7 +17,7 @@ import piq
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, initial_alpha=0.5, initial_log_sigma_mask=0.0, initial_log_sigma_unmask=0.0):
+    def __init__(self, initial_alpha=0.5, mask_weight = 0.5, unmasked_weight = 0.5):
         """
         Initialize the combined loss function.
         :param initial_alpha: Initial weight for MSE and SSIM loss.
@@ -28,10 +28,9 @@ class CombinedLoss(nn.Module):
         # Initialize logit_alpha such that sigmoid(logit_alpha) = initial_alpha
         initial_logit_alpha = torch.log(torch.tensor(initial_alpha / (1 - initial_alpha)))
         self.logit_alpha = nn.Parameter(initial_logit_alpha)
-        # self.mask_weight = nn.Parameter(torch.tensor(mask_weight))
-        # self.unmask_weight = nn.Parameter(torch.tensor(unmask_weight))
-        self.log_sigma_mask = nn.Parameter(torch.tensor(initial_log_sigma_mask))
-        self.log_sigma_unmask = nn.Parameter(torch.tensor(initial_log_sigma_unmask))
+        self.mask_weight = mask_weight
+        self.unmask_weight = unmasked_weight
+
 
 
 
@@ -58,19 +57,9 @@ class CombinedLoss(nn.Module):
         combined_loss_unmasked = alpha * mse_loss_unmasked + (1 - alpha) * ssim_loss_unmasked
 
         # Apply mask and unmask weights
-        # final_loss = self.mask_weight * combined_loss_masked + self.unmask_weight * combined_loss_unmasked
+        final_loss = self.mask_weight * combined_loss_masked + self.unmask_weight * combined_loss_unmasked
 
-        # Compute uncertainty-based weighting
-        # sigma_mask = exp(log_sigma_mask), sigma_unmask = exp(log_sigma_unmask)
-        precision_mask = torch.exp(-self.log_sigma_mask)
-        precision_unmask = torch.exp(-self.log_sigma_unmask)
-
-        # Weighted losses with uncertainty
-        loss_masked = precision_mask * combined_loss_masked + self.log_sigma_mask
-        loss_unmasked = precision_unmask * combined_loss_unmasked + self.log_sigma_unmask
-
-        # Total loss
-        final_loss = loss_masked + loss_unmasked
+      
 
         return final_loss
 
@@ -170,22 +159,15 @@ class Aux_MAML(MetaTemplate):
                        if p.requires_grad and p not in stainnet_params and p not in aux_loss_params]
 
         # Collect aux_loss_fn parameters
-        # aux_params = [p for p in aux_loss_params if p.requires_grad]
-
-        # # Initialize the optimizer with parameter groups
-        # self.optimizer = torch.optim.Adam([
-        #     {'params': main_params, 'lr': 0.0001},
-        #     {'params': aux_params, 'lr': 0.05}
-        # ])
-
-        # Include hyperparameters from CombinedLoss
-        hyperparams = list(self.aux_loss_fn.parameters())
+        aux_params = [p for p in aux_loss_params if p.requires_grad]
 
         # Initialize the optimizer with parameter groups
         self.optimizer = torch.optim.Adam([
             {'params': main_params, 'lr': 0.0001},
-            {'params': hyperparams, 'lr': 0.05}  # Higher LR for hyperparameters
+            {'params': aux_params, 'lr': 0.05}
         ])
+
+
 
     def parameters(self):
         # Override the parameters method to exclude StainNet's parameters
@@ -572,15 +554,7 @@ class Aux_MAML(MetaTemplate):
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
 
-                # mask_weight = torch.sigmoid(self.mask_weight_param).item()
-                # unmask_weight = 1.0 - mask_weight
-                # print(f'Epoch {epoch} | Batch {i}/{len(train_loader)} | Loss {avg_loss / (i + 1):.4f} | '
-                #       f'Mask Weight: {self.weight_mask:.4f} | Unmask Weight: {self.weight_unmask:.4f}')
-                alpha = torch.sigmoid(self.aux_loss_fn.logit_alpha).item()
-                sigma_mask = torch.exp(self.aux_loss_fn.log_sigma_mask).item()
-                sigma_unmask = torch.exp(self.aux_loss_fn.log_sigma_unmask).item()
-                print(f'Epoch {epoch} | Alpha: {alpha:.4f} | Sigma Mask: {sigma_mask:.4f} | Sigma Unmask: {sigma_unmask:.4f}')
-                
+        
         self.train_loss = avg_loss/len(train_loader)
         self.train_confidence = sum(all_confidences) / len(all_confidences)
         self.train_entropy = sum(all_entropies) / len(all_entropies)
