@@ -17,7 +17,7 @@ import piq
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, initial_alpha=0.5, mask_weight = 0.5, unmasked_weight = 0.5):
+    def __init__(self, initial_alpha=0.5, mask_weight = 0.5, unmask_weight = 0.5):
         """
         Initialize the combined loss function.
         :param initial_alpha: Initial weight for MSE and SSIM loss.
