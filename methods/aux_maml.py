@@ -89,8 +89,8 @@ class Aux_MAML(MetaTemplate):
         print('aux_task:', self.aux_task)
         self.feature = backbone.ConvNet(4, flatten=False)
         self.loss_fn = nn.CrossEntropyLoss()
-        # self.aux_loss_fn = CombinedLoss(initial_alpha=0.5, mask_weight=0.5, unmask_weight=0.5)
-        self.aux_loss_fn = CombinedLoss(initial_alpha=0.5, initial_log_sigma_mask=0.0, initial_log_sigma_unmask=0.0).cuda()
+        self.aux_loss_fn = CombinedLoss(initial_alpha=0.5, mask_weight=0.5, unmask_weight=0.5)
+
 
         self.classifier = backbone.Linear_fw(self.feat_dim, n_way)
         self.classifier.bias.data.fill_(0)
