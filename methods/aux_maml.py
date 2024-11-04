@@ -151,24 +151,19 @@ class Aux_MAML(MetaTemplate):
     def init_optimizer(self):
         # Exclude stainnet_model parameters
         stainnet_params = set(self.stainnet_model.parameters())
-        
-        # Exclude aux_loss_fn parameters
-        aux_loss_params = set(self.aux_loss_fn.parameters())
-
-        # Collect main model parameters (excluding stainnet_model and aux_loss_fn parameters)
+    
+        # Include hyperparameters: aux_loss_weight and parameters from aux_loss_fn
+        hyperparams = list(self.aux_loss_fn.parameters()) + [self.aux_loss_weight]
+    
+        # Collect main model parameters (excluding stainnet_model parameters and hyperparameters)
+        exclude_params = stainnet_params.union(set(hyperparams))
         main_params = [p for p in self.parameters()
-                       if p.requires_grad and p not in stainnet_params and p not in aux_loss_params]
-
-        # Collect aux_loss_fn parameters
-        aux_params = [p for p in aux_loss_params if p.requires_grad]
-
-        hyperparams = [self.aux_loss_weight]
-
+                       if p.requires_grad and p not in exclude_params]
+    
         # Initialize the optimizer with parameter groups
         self.optimizer = torch.optim.Adam([
             {'params': main_params, 'lr': 0.0001},
-            {'params': aux_params, 'lr': 0.05},
-            {'params': hyperparams, 'lr': 0.05}
+            {'params': hyperparams, 'lr': 0.01}  # Learning rate for hyperparameters
         ])
 
 
