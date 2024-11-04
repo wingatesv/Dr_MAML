@@ -168,7 +168,7 @@ class Aux_MAML(MetaTemplate):
         self.optimizer = torch.optim.Adam([
             {'params': main_params, 'lr': 0.0001},
             {'params': aux_params, 'lr': 0.05},
-            {'params': hyperparams, 'lr': 0.05'}
+            {'params': hyperparams, 'lr': 0.05}
         ])
 
 
