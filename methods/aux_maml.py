@@ -119,7 +119,8 @@ class Aux_MAML(MetaTemplate):
 
             # self.log_sigma_mask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
             # self.log_sigma_unmask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
-            pass
+            self.aux_loss_weight = nn.Parameter(torch.tensor(0.5))
+        
             
 
         if self.aux_task in ['sn', 'sn_inpainting']:
@@ -161,10 +162,13 @@ class Aux_MAML(MetaTemplate):
         # Collect aux_loss_fn parameters
         aux_params = [p for p in aux_loss_params if p.requires_grad]
 
+        hyperparams = [self.aux_loss_weight]
+
         # Initialize the optimizer with parameter groups
         self.optimizer = torch.optim.Adam([
             {'params': main_params, 'lr': 0.0001},
-            {'params': aux_params, 'lr': 0.05}
+            {'params': aux_params, 'lr': 0.05},
+            {'params': hyperparams, 'lr': 0.05'}
         ])
 
 
@@ -350,8 +354,9 @@ class Aux_MAML(MetaTemplate):
              # fast_parameters = [p for p in self.parameters() if p not in aux_loss_params]
 
              # Collect fast_parameters excluding uncertainty parameters
-            uncertainty_params = set(self.aux_loss_fn.parameters())
-            fast_parameters = [p for p in self.parameters() if p not in uncertainty_params]
+
+            global_params = set(self.aux_loss_fn.parameters()).union({self.aux_loss_weight})
+            fast_parameters = [p for p in self.parameters() if p not in global_params]
 
         else:
             fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
@@ -452,7 +457,8 @@ class Aux_MAML(MetaTemplate):
             
     
             # Total loss
-            total_loss = set_loss_cls + 0.5 * aux_loss
+            # total_loss = set_loss_cls + 0.5 * aux_loss
+            total_loss = set_loss_cls + self.aux_loss_weight * aux_loss
 
             grad = torch.autograd.grad(total_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
             if self.approx:
@@ -462,7 +468,7 @@ class Aux_MAML(MetaTemplate):
                  # for k, weight in enumerate([p for p in self.parameters() if p is not self.log_sigma_mask and p is not self.log_sigma_unmask ]):
                 # aux_loss_params = set(self.aux_loss_fn.parameters())
                 # for k, weight in enumerate([p for p in self.parameters() if p not in aux_loss_params]):
-                for k, weight in enumerate([p for p in self.parameters() if p not in uncertainty_params]):
+                for k, weight in enumerate([p for p in self.parameters() if p not in global_params]):
                     #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                     if weight.fast is None:
                         weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
