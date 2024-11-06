@@ -154,7 +154,7 @@ class Aux_MAML(MetaTemplate):
         stainnet_params = set(self.stainnet_model.parameters())
     
         # Include hyperparameters: aux_loss_weight and parameters from aux_loss_fn
-        hyperparams = list(self.aux_loss_fn.parameters()) + [self.aux_loss_weight]
+        hyperparams = list(self.aux_loss_fn.parameters())
     
         # Collect main model parameters (excluding stainnet_model parameters and hyperparameters)
         exclude_params = stainnet_params.union(set(hyperparams))
