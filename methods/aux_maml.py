@@ -120,7 +120,7 @@ class Aux_MAML(MetaTemplate):
             # self.log_sigma_mask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
             # self.log_sigma_unmask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
             # self.aux_loss_weight = nn.Parameter(torch.tensor(0.5))
-            continue
+            pass
         
             
 
