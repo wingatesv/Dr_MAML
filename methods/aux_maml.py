@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import random
 import cv2
 import piq
+import utils
 
 
 
@@ -344,19 +345,21 @@ class Aux_MAML(MetaTemplate):
 
         
         if is_training and self.aux_task == 'sn_inpainting':
-            global_params = set(self.aux_loss_fn.parameters())
-            fast_parameters = [p for p in self.parameters() if p not in global_params]
+          global_params = set(self.aux_loss_fn.parameters())
+          fast_parameters = [p for p in self.parameters() if p not in global_params]
 
         else:
-            fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
+          # Exclude parameters not used during testing (e.g., inpainting_head)
+          global_params = set(self.inpainting_head.parameters()).union(self.aux_loss_fn.parameters())
+          fast_parameters = [p for p in self.parameters() if p not in global_params]
 
+
+       
         
         for weight in self.parameters():
             weight.fast = None
         self.zero_grad()
 
-        # Initialize the combined MSE + SSIM loss
-        # combined_loss_fn = CombinedLoss(alpha=0.5).cuda()
 
         for task_step in range(self.task_update_num): 
             
@@ -405,26 +408,16 @@ class Aux_MAML(MetaTemplate):
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
             fast_parameters = []
             
-            if is_training and self.aux_task == 'sn_inpainting':
-                 # for k, weight in enumerate([p for p in self.parameters() if p is not self.log_sigma_mask and p is not self.log_sigma_unmask ]):
-                # aux_loss_params = set(self.aux_loss_fn.parameters())
-                # for k, weight in enumerate([p for p in self.parameters() if p not in aux_loss_params]):
-                for k, weight in enumerate([p for p in self.parameters() if p not in global_params]):
-                    #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                    if weight.fast is None:
-                        weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
-                    else:
-                        weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
-                    fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
 
-            else:
-                for k, weight in enumerate(self.parameters()):
-                    #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                    if weight.fast is None:
-                        weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
-                    else:
-                        weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
-                    fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
+            for k, weight in enumerate([p for p in self.parameters() if p not in global_params]):
+                #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+                if weight.fast is None:
+                    weight.fast = weight - self.train_lr * grad[k] #create weight.fast 
+                else:
+                    weight.fast = weight.fast - self.train_lr * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+                fast_parameters.append(weight.fast) #gradients calculated in line 45 are based on newest fast weight, but the graph will retain the link to old weight.fasts
+
+
 
 
         # feed forward query data
