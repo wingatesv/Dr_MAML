@@ -119,7 +119,8 @@ class Aux_MAML(MetaTemplate):
 
             # self.log_sigma_mask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
             # self.log_sigma_unmask = nn.Parameter(torch.tensor(0.0), requires_grad=True)
-            self.aux_loss_weight = nn.Parameter(torch.tensor(0.5))
+            # self.aux_loss_weight = nn.Parameter(torch.tensor(0.5))
+            continue
         
             
 
@@ -313,7 +314,7 @@ class Aux_MAML(MetaTemplate):
     
         return masks.cuda()
         
-    def set_forward(self,x, is_feature = False):
+    def set_forward(self,x, is_feature = False, is_training=True):
         assert is_feature == False, 'Aux_MAML do not support fixed feature' 
         
         x = x.cuda()
@@ -322,39 +323,34 @@ class Aux_MAML(MetaTemplate):
         x_b_i = x_var[:,self.n_support:,:,:,:].contiguous().view( self.n_way* self.n_query,   *x.size()[2:]) #query data
         y_a_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_support ) )).cuda() #label for support data
 
+        if is_training:
+            if self.aux_task == 'sn':
+                # Generate stain-normalized images for the support data
+                with torch.no_grad():
+                    stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
+            elif self.aux_task == 'inpainting':
+                # Generate masked images and masks for the inpainting task
+                masked_images, masks = self.random_block_mask(x_a_i)
+            elif self.aux_task == 'segmentation':
+                #  Generate segmentation masks using Otsu's method
+                tissue_masks = self.generate_mask(x_a_i, method = self.segmentation_method)  # Generates binary masks for support data
+                
+            elif self.aux_task == 'sn_inpainting':
+                # Generate stain-normalized images for the support data
+                with torch.no_grad():
+                    stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
+                # Generate masked images and masks for the inpainting task
+                masked_images, masks = self.random_block_mask(stain_normalized_images)
 
-        if self.aux_task == 'sn':
-            # Generate stain-normalized images for the support data
-            with torch.no_grad():
-                stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
-        elif self.aux_task == 'inpainting':
-            # Generate masked images and masks for the inpainting task
-            masked_images, masks = self.random_block_mask(x_a_i)
-        elif self.aux_task == 'segmentation':
-            #  Generate segmentation masks using Otsu's method
-            tissue_masks = self.generate_mask(x_a_i, method = self.segmentation_method)  # Generates binary masks for support data
-            
-        elif self.aux_task == 'sn_inpainting':
-            # Generate stain-normalized images for the support data
-            with torch.no_grad():
-                stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
-
-            # Generate masked images and masks for the inpainting task
-            masked_images, masks = self.random_block_mask(stain_normalized_images)
-
-        if self.aux_task == 'sn_inpainting':
-            # fast_parameters = [p for p in self.parameters() if p is not self.mask_weight_param]
-            # fast_parameters = [p for p in self.parameters() if p is not  self.log_sigma_mask and p is not self.log_sigma_unmask ]
-             # aux_loss_params = set(self.aux_loss_fn.parameters())
-             # fast_parameters = [p for p in self.parameters() if p not in aux_loss_params]
-
-             # Collect fast_parameters excluding uncertainty parameters
-
-            global_params = set(self.aux_loss_fn.parameters()).union({self.aux_loss_weight})
+        
+        if is_training and self.aux_task == 'sn_inpainting':
+            global_params = set(self.aux_loss_fn.parameters())
             fast_parameters = [p for p in self.parameters() if p not in global_params]
 
         else:
             fast_parameters = list(self.parameters()) #the first gradient calcuated in line 45 is based on original weight
+
+        
         for weight in self.parameters():
             weight.fast = None
         self.zero_grad()
@@ -367,99 +363,49 @@ class Aux_MAML(MetaTemplate):
             scores = self.forward(x_a_i)
             set_loss_cls = self.loss_fn( scores, y_a_i) 
 
-            if self.aux_task == 'sn':
-                # Inpainting forward pass
-                features = self.feature(x_a_i)
-                predicted_images = self.inpainting_head(features)
-                # Compute stain normalization loss
-                aux_loss = nn.L1Loss()(predicted_images, stain_normalized_images)
-
-            elif self.aux_task == 'inpainting':
-                 # Inpainting forward pass
-                features = self.feature(masked_images)
-                reconstructed_images = self.inpainting_head(features)
-                # Compute inpainting loss on masked regions
-                aux_loss = F.mse_loss(reconstructed_images * (1 - masks), x_a_i * (1 - masks))
-                
-            elif self.aux_task == 'segmentation':
-                 # Inpainting forward pass
-                features = self.feature(x_a_i)
-                predicted_masks = self.inpainting_head(features)
-                # Compute inpainting loss on masked regions
-                aux_loss = nn.BCELoss()(predicted_masks, tissue_masks)  # Binary cross-entropy loss
-
-            elif self.aux_task == 'sn_inpainting':
-
-                # Inpainting forward pass
-                features = self.feature(masked_images)
-                reconstructed_images = self.inpainting_head(features)
-
-                aux_loss = self.aux_loss_fn(reconstructed_images, stain_normalized_images, masks)
-    
-                # Compute auxiliary loss as the difference between reconstructed images and stain-normalized images
-                # aux_loss = F.mse_loss(reconstructed_images, stain_normalized_images)
-
-                # Compute a weighted loss
-                # mask_weight = 0.8  # Weight for masked regions
-                # unmask_weight = 0.5  # Weight for unmasked regions
-
-                # # Compute mask_weight using sigmoid to constrain between 0 and 1
-                # # mask_weight = torch.sigmoid(self.mask_weight_param)
-                # # unmask_weight = 1.0 - mask_weight
-                
-                # # loss_masked = F.mse_loss(reconstructed_images * masks, stain_normalized_images * masks)
-                # # loss_unmasked = F.mse_loss(reconstructed_images * (1 - masks), stain_normalized_images * (1 - masks))
-                # # ssim loss
-                # reconstructed_images = torch.clamp(reconstructed_images, 0.0, 1.0)
-                # stain_normalized_images = torch.clamp(stain_normalized_images, 0.0, 1.0)
-
-                # # aux_loss = combined_loss_fn(reconstructed_images, stain_normalized_images)
-
-
-                # # Set data_range to 1.0
-                # data_range = 1.0
-
-                # # # Compute SSIM loss
-                # loss_masked = 1 - piq.ssim(
-                #     reconstructed_images * masks, 
-                #     stain_normalized_images * masks, 
-                #     data_range=data_range
-                # )
-
-                # loss_unmasked = 1 - piq.ssim(
-                #     reconstructed_images * (1 - masks), 
-                #     stain_normalized_images * (1 - masks), 
-                #     data_range=data_range
-                # )
-
-
-                # aux_loss = mask_weight * loss_masked + unmask_weight * loss_unmasked
-
-                # Compute weights based on log variances
-                # self.weight_mask = 1 / (2 * torch.exp(self.log_sigma_mask))
-                # self.weight_unmask = 1 / (2 * torch.exp(self.log_sigma_unmask))
-
-                # aux_loss = self.weight_mask * loss_masked + self.weight_unmask * loss_unmasked
-                # # Add the log variance terms to the loss (as per Kendall et al. 2018)
-                # aux_loss += self.log_sigma_mask + self.log_sigma_unmask
-                # make sure the stain normalization function is uncommented
-                # Compute Perceptual Loss
-                # aux_loss = perceptual_loss_fn(reconstructed_images, stain_normalized_images)
-                
-                
-
-                
             
+            if is_training:
+                if self.aux_task == 'sn':
+                    # Inpainting forward pass
+                    features = self.feature(x_a_i)
+                    predicted_images = self.inpainting_head(features)
+                    # Compute stain normalization loss
+                    aux_loss = nn.L1Loss()(predicted_images, stain_normalized_images)
     
-            # Total loss
-            # total_loss = set_loss_cls + 0.5 * aux_loss
-            total_loss = set_loss_cls + self.aux_loss_weight * aux_loss
+                elif self.aux_task == 'inpainting':
+                     # Inpainting forward pass
+                    features = self.feature(masked_images)
+                    reconstructed_images = self.inpainting_head(features)
+                    # Compute inpainting loss on masked regions
+                    aux_loss = F.mse_loss(reconstructed_images * (1 - masks), x_a_i * (1 - masks))
+                    
+                elif self.aux_task == 'segmentation':
+                     # Inpainting forward pass
+                    features = self.feature(x_a_i)
+                    predicted_masks = self.inpainting_head(features)
+                    # Compute inpainting loss on masked regions
+                    aux_loss = nn.BCELoss()(predicted_masks, tissue_masks)  # Binary cross-entropy loss
+    
+                elif self.aux_task == 'sn_inpainting':
+    
+                    # Inpainting forward pass
+                    features = self.feature(masked_images)
+                    reconstructed_images = self.inpainting_head(features)
+    
+                    aux_loss = self.aux_loss_fn(reconstructed_images, stain_normalized_images, masks)
+                # Total loss
+                total_loss = set_loss_cls + 0.5 * aux_loss
+
+            else:
+                total_loss = set_loss_cls
+
 
             grad = torch.autograd.grad(total_loss, fast_parameters, create_graph=True) #build full graph support gradient of gradient
             if self.approx:
                 grad = [ g.detach()  for g in grad ] #do not calculate gradient of gradient if using first order approximation
             fast_parameters = []
-            if self.aux_task == 'sn_inpainting':
+            
+            if is_training and self.aux_task == 'sn_inpainting':
                  # for k, weight in enumerate([p for p in self.parameters() if p is not self.log_sigma_mask and p is not self.log_sigma_unmask ]):
                 # aux_loss_params = set(self.aux_loss_fn.parameters())
                 # for k, weight in enumerate([p for p in self.parameters() if p not in aux_loss_params]):
@@ -489,8 +435,8 @@ class Aux_MAML(MetaTemplate):
         raise ValueError('Aux_MAML performs further adapation simply by increasing task_upate_num')
 
 
-    def set_forward_loss(self, x):
-        scores = self.set_forward(x, is_feature = False)
+    def set_forward_loss(self, x, is_training=True):
+        scores = self.set_forward(x, is_feature = False, is_training = is_training)
         y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
         loss = self.loss_fn(scores, y_b_i)
 
@@ -516,7 +462,7 @@ class Aux_MAML(MetaTemplate):
             assert self.n_way  ==  x.size(0), "Aux_MAML do not support way change"
             
 
-            loss, scores = self.set_forward_loss(x)
+            loss, scores = self.set_forward_loss(x, is_training=True)
             avg_loss = avg_loss+loss.item()
             loss_all.append(loss)
 
@@ -561,6 +507,23 @@ class Aux_MAML(MetaTemplate):
         self.train_entropy = sum(all_entropies) / len(all_entropies)
         self.grad_norm = sum(grad_norms) / len(grad_norms)
 
+    def correct(self, x, is_training=False):       
+        scores = self.set_forward(x, is_training=is_training)
+        y = torch.from_numpy(np.repeat(range(self.n_way), self.n_query))
+        
+        if hasattr(self, 'loss_type') and self.loss_type == 'mse':
+            y = utils.one_hot(y, self.n_way)
+            
+        y = Variable(y.cuda())
+        loss = self.loss_fn(scores, y)
+
+        y_query = np.repeat(range( self.n_way ), self.n_query )
+
+        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind[:,0] == y_query)
+        return float(top1_correct), len(y_query), loss
+        
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
         count = 0
@@ -572,7 +535,7 @@ class Aux_MAML(MetaTemplate):
         for i, (x,_) in enumerate(tqdm(test_loader, desc='Testing', leave=False)):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way  ==  x.size(0), "Aux_MAML do not support way change"
-            correct_this, count_this, loss = self.correct(x)
+            correct_this, count_this, loss = self.correct(x, is_training=False)
             acc_all.append(correct_this/ count_this *100 )
             avg_loss = avg_loss+loss.item()
 
