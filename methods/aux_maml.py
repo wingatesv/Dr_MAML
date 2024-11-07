@@ -282,6 +282,22 @@ class Aux_MAML(MetaTemplate):
         masked_images = images * (1 - masks)
         return masked_images, masks
 
+    def multi_scale_mask(self, images, scales=[0.1, 0.2, 0.3], num_patches=5):
+        batch_size, _, h, w = images.shape
+        masks = torch.ones((batch_size, 1, h, w), device=images.device)
+        for i in range(batch_size):
+            for scale in scales:
+                for _ in range(num_patches):
+                    block_size_h = int(scale * h * random.uniform(0.5, 1.5))
+                    block_size_w = int(scale * w * random.uniform(0.5, 1.5))
+                    y = random.randint(0, h - block_size_h)
+                    x = random.randint(0, w - block_size_w)
+                    masks[i, 0, y:y + block_size_h, x:x + block_size_w] = 0
+        masks = masks.expand(-1, images.size(1), -1, -1)
+        masked_images = images * masks
+        return masked_images, masks
+
+
     def generate_mask(self, image_batch, method='otsu'):
         batch_size, _, h, w = image_batch.size()
         masks = torch.zeros(batch_size, 1, h, w).cuda()
@@ -360,6 +376,8 @@ class Aux_MAML(MetaTemplate):
                 # Generate masked images and masks for the inpainting task
                 # masked_images, masks = self.random_block_mask(stain_normalized_images) baseline
                 masked_images, masks = self.random_irregular_mask(stain_normalized_images) # first variant
+                # masked_images, masks = self.multi_scale_mask(stain_normalized_images) # second variant
+                
                 
 
         
