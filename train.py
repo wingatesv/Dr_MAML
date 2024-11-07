@@ -290,7 +290,7 @@ if __name__=='__main__':
           backbone.ResNet.maml = True
 
           if params.method in ['maml', 'maml_approx']:
-            model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , **train_few_shot_params )
+            model = MAML(  model_dict[params.model], approx = (params.method == 'maml_approx') , number_of_inner_loop = params.number_of_inner_loop, **train_few_shot_params )
 
           elif params.method == 'aux_maml':
             model = Aux_MAML(  model_dict[params.model], approx = False, **train_few_shot_params )
