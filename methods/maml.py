@@ -12,7 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 class MAML(MetaTemplate):
-    def __init__(self, model_func,  n_way, n_support, approx = False, test_mode = False):
+    def __init__(self, model_func,  n_way, n_support, approx = False, number_of_inner_loop = 5,test_mode = False):
         super(MAML, self).__init__( model_func,  n_way, n_support, change_way = False)
 
         self.loss_fn = nn.CrossEntropyLoss()
@@ -20,7 +20,8 @@ class MAML(MetaTemplate):
         self.classifier.bias.data.fill_(0)
         self.test_mode  = test_mode
         self.n_task     = 4 #meta-batch, meta update every meta batch
-        self.task_update_num = 5
+        self.task_update_num = number_of_inner_loop
+        print('Number of inner loop: ', self.task_update_num)
         self.train_lr = 0.01 #this is the inner loop learning rate
         self.approx = approx #first order approx.    
         self.inner_loop_steps_list  = []  
