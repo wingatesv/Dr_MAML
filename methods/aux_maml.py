@@ -220,12 +220,6 @@ class Aux_MAML(MetaTemplate):
       # Unnormalize the images to bring them back to [0, 1] range
       images = self.unnormalize(images, mean, std)
 
-
-      # Check the pixel value range
-      # min_val = images.min()
-      # max_val = images.max()
-      # print(f'Input images pixel range: [{min_val.item()}, {max_val.item()}]')
-  
       # Ensure images are in the range [-1, 1]
       if images.min() >= 0 and images.max() <= 1:
           images = images * 2 - 1  # Scale from [0, 1] to [-1, 1]
@@ -263,6 +257,29 @@ class Aux_MAML(MetaTemplate):
     
         masks = masks.expand(-1, images.size(1), -1, -1)  # Expand to match the number of channels
         masked_images = images * masks
+        return masked_images, masks
+
+
+    def random_irregular_mask(self, images, max_vertex=4, max_length=40, max_brush_width=20, max_angle=360):
+        batch_size, _, h, w = images.shape
+        masks = torch.zeros((batch_size, 1, h, w), device=images.device)
+        for i in range(batch_size):
+            num_strokes = random.randint(1, max_vertex)
+            mask = np.zeros((h, w), dtype=np.float32)
+            for _ in range(num_strokes):
+                start_x = random.randint(0, w)
+                start_y = random.randint(0, h)
+                for _ in range(random.randint(1, max_vertex)):
+                    angle = random.uniform(0, max_angle)
+                    length = random.uniform(10, max_length)
+                    brush_width = random.uniform(10, max_brush_width)
+                    end_x = int(start_x + length * np.cos(np.deg2rad(angle)))
+                    end_y = int(start_y + length * np.sin(np.deg2rad(angle)))
+                    cv2.line(mask, (start_x, start_y), (end_x, end_y), 1.0, int(brush_width))
+                    start_x, start_y = end_x, end_y
+            masks[i, 0, :, :] = torch.from_numpy(mask)
+        masks = masks.expand(-1, images.size(1), -1, -1)
+        masked_images = images * (1 - masks)
         return masked_images, masks
 
     def generate_mask(self, image_batch, method='otsu'):
@@ -341,7 +358,9 @@ class Aux_MAML(MetaTemplate):
                 with torch.no_grad():
                     stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
                 # Generate masked images and masks for the inpainting task
-                masked_images, masks = self.random_block_mask(stain_normalized_images)
+                # masked_images, masks = self.random_block_mask(stain_normalized_images) baseline
+                masked_images, masks = self.random_irregular_mask(stain_normalized_images) # first variant
+                
 
         
         if is_training and self.aux_task == 'sn_inpainting':
