@@ -165,10 +165,10 @@ class MAML(MetaTemplate):
             optimizer.zero_grad()
             if i % print_freq==0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i, len(train_loader), avg_loss/float(i+1)))
-            self.train_loss = avg_loss/len(train_loader)
-            self.train_confidence = sum(all_confidences) / len(all_confidences)
-            self.train_entropy = sum(all_entropies) / len(all_entropies)
-            self.grad_norm = sum(grad_norms) / len(grad_norms)
+        self.train_loss = avg_loss/len(train_loader)
+        self.train_confidence = sum(all_confidences) / len(all_confidences)
+        self.train_entropy = sum(all_entropies) / len(all_entropies)
+        self.grad_norm = sum(grad_norms) / len(grad_norms)
 
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
