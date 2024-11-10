@@ -191,13 +191,13 @@ if __name__=='__main__':
     elif params.dataset == 'BreaKHis_20x_2':
         base_file = configs.data_dir['BreaKHis_20x'] + 'base_2.json' 
         val_file   = configs.data_dir['BreaKHis_20x'] + 'val_2.json' 
-    elif params.dataset == 'BreaKHis_40x_2' or params.dataset == 'cross_IDC':
+    elif params.dataset == 'BreaKHis_40x_2' or params.dataset == 'BreaKHis_cross_IDC':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
         val_file   = configs.data_dir['BreaKHis_40x'] + 'val_2.json' 
-    elif params.dataset == 'ISIC_2':
+    elif params.dataset == 'ISIC_2' or params.dataset == 'ISIC_cross_IDC'::
         base_file = configs.data_dir['ISIC'] + 'base_2.json' 
         val_file   = configs.data_dir['ISIC'] + 'val_2.json' 
-    elif params.dataset == 'Smear_2':
+    elif params.dataset == 'Smear_2' or params.dataset == 'Smear_cross_IDC'::
         base_file = configs.data_dir['Smear'] + 'base_2.json' 
         val_file   = configs.data_dir['Smear'] + 'val_2.json'
 
@@ -205,7 +205,7 @@ if __name__=='__main__':
         raise ValueError(f"Unsupported dataset: {params.dataset}")
 
     # Set number of classes for baseline training
-    if params.dataset == 'Smear' or params.dataset == 'ISIC':
+    if params.dataset == 'Smear_2' or params.dataset == 'ISIC_2':
       params.num_classes = 7
     else:
       params.num_classes = 8
