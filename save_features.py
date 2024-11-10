@@ -123,11 +123,27 @@ if __name__ == '__main__':
       else:
           loadfile  = configs.data_dir['Smear'] + split + '_2.json'
 
-    elif params.dataset == 'cross_IDC':
+    elif params.dataset == 'BreaKHis_cross_IDC':
       if split == 'base':
           loadfile = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
       elif split == 'val':
            loadfile  = configs.data_dir['BreaKHis_40x'] + 'val_2.json'
+      else:
+           loadfile  = configs.data_dir['BCHI'] + 'novel.json'
+
+    elif params.dataset == 'ISIC_cross_IDC':
+      if split == 'base':
+          loadfile = configs.data_dir['ISIC'] + 'base_2.json' 
+      elif split == 'val':
+           loadfile  = configs.data_dir['ISIC'] + 'val_2.json'
+      else:
+           loadfile  = configs.data_dir['BCHI'] + 'novel.json'
+
+    elif params.dataset == 'Smear_cross_IDC':
+      if split == 'base':
+          loadfile = configs.data_dir['Smear'] + 'base_2.json' 
+      elif split == 'val':
+           loadfile  = configs.data_dir['Smear'] + 'val_2.json'
       else:
            loadfile  = configs.data_dir['BCHI'] + 'novel.json'
          
@@ -136,7 +152,14 @@ if __name__ == '__main__':
     else:
         raise ValueError(f"Unsupported dataset: {params.dataset}")
 
-    checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
+    if params.dataset == 'BreaKHis_cross_IDC':
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, "BreaKHis40X_2", params.model, params.method)
+    elif params.dataset == 'ISIC_cross_IDC':
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, "ISIC_2", params.model, params.method)
+    elif params.dataset == 'Smear_cross_IDC':
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, "Smear_2", params.model, params.method)
+    else:
+        checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(configs.save_dir, params.dataset, params.model, params.method)
 
     if params.train_aug :
         checkpoint_dir += f'_{params.train_aug}'
