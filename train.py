@@ -194,10 +194,10 @@ if __name__=='__main__':
     elif params.dataset == 'BreaKHis_40x_2' or params.dataset == 'BreaKHis_cross_IDC':
         base_file = configs.data_dir['BreaKHis_40x'] + 'base_2.json' 
         val_file   = configs.data_dir['BreaKHis_40x'] + 'val_2.json' 
-    elif params.dataset == 'ISIC_2' or params.dataset == 'ISIC_cross_IDC'::
+    elif params.dataset == 'ISIC_2' or params.dataset == 'ISIC_cross_IDC':
         base_file = configs.data_dir['ISIC'] + 'base_2.json' 
         val_file   = configs.data_dir['ISIC'] + 'val_2.json' 
-    elif params.dataset == 'Smear_2' or params.dataset == 'Smear_cross_IDC'::
+    elif params.dataset == 'Smear_2' or params.dataset == 'Smear_cross_IDC':
         base_file = configs.data_dir['Smear'] + 'base_2.json' 
         val_file   = configs.data_dir['Smear'] + 'val_2.json'
 
