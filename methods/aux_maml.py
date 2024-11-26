@@ -297,6 +297,34 @@ class Aux_MAML(MetaTemplate):
         masked_images = images * masks
         return masked_images, masks
 
+   
+
+    def perlin_noise_mask(self, images, scale=4):
+        batch_size, _, h, w = images.shape
+        masks = torch.zeros((batch_size, 1, h, w), device=images.device)
+        for i in range(batch_size):
+            noise = torch.rand((1, h // scale, w // scale), device=images.device)
+            noise = F.interpolate(noise.unsqueeze(0), size=(h, w), mode='bilinear', align_corners=False)
+            masks[i, 0, :, :] = (noise.squeeze(0) > 0.5).float()
+        masks = masks.expand(-1, images.size(1), -1, -1)
+        masked_images = images * masks
+        return masked_images, masks
+
+    def circular_mask(self, images, num_circles=3, max_radius=20):
+        batch_size, _, h, w = images.shape
+        masks = torch.ones((batch_size, 1, h, w), device=images.device)
+        for i in range(batch_size):
+            for _ in range(num_circles):
+                center_x = random.randint(0, w - 1)
+                center_y = random.randint(0, h - 1)
+                radius = random.randint(5, max_radius)
+                y, x = torch.meshgrid(torch.arange(h, device=images.device), torch.arange(w, device=images.device))
+                dist = ((x - center_x) ** 2 + (y - center_y) ** 2) ** 0.5
+                masks[i, 0, :, :] *= (dist > radius).float()
+        masks = masks.expand(-1, images.size(1), -1, -1)
+        masked_images = images * masks
+        return masked_images, masks
+
 
     def generate_mask(self, image_batch, method='otsu'):
         batch_size, _, h, w = image_batch.size()
@@ -377,6 +405,8 @@ class Aux_MAML(MetaTemplate):
                 # masked_images, masks = self.random_block_mask(stain_normalized_images) baseline
                 masked_images, masks = self.random_irregular_mask(stain_normalized_images) # first variant
                 # masked_images, masks = self.multi_scale_mask(stain_normalized_images) # second variant
+                # masked_images, masks = self.perlin_noise_mask(stain_normalized_images)
+                # masked_images, masks = self.circular_mask(stain_normalized_images)
                 
                 
 
