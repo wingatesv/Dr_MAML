@@ -325,14 +325,12 @@ class Aux_MAML(MetaTemplate):
         masked_images = images * masks
         return masked_images, masks
 
-    def apply_random_mask(self, images, seed=10):
+    def apply_random_mask(self, images):
 
-        if seed is not None:
-            random.seed(seed)  # Set the seed for reproducibility
     
         # Define the available mask types
         mask_type = random.choice(['multi_scale', 'circular',  'random_block'])
-        print('Choice: ', mask_type)
+
     
         # Apply the corresponding mask function
         if mask_type == 'multi_scale':
