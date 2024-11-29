@@ -325,6 +325,25 @@ class Aux_MAML(MetaTemplate):
         masked_images = images * masks
         return masked_images, masks
 
+    def apply_random_mask(self, images, seed=10):
+
+        if seed is not None:
+            random.seed(seed)  # Set the seed for reproducibility
+    
+        # Define the available mask types
+        mask_type = random.choice(['multi_scale', 'circular',  'random_block'])
+    
+        # Apply the corresponding mask function
+        if mask_type == 'multi_scale':
+            return self.multi_scale_mask(images)
+        elif mask_type == 'perlin':
+            return self.perlin_noise_mask(images)
+        elif mask_type == 'circular':
+            return self.circular_mask(images)
+        elif mask_type == 'random_irregular':
+            return self.random_irregular_mask(images)
+        elif mask_type == 'random_block':
+            return self.random_block_mask(images)
 
     def generate_mask(self, image_batch, method='otsu'):
         batch_size, _, h, w = image_batch.size()
@@ -403,11 +422,11 @@ class Aux_MAML(MetaTemplate):
                     stain_normalized_images = self.stain_normalize(x_a_i)  # Function to generate stain-normalized images
                 # Generate masked images and masks for the inpainting task
                 # masked_images, masks = self.random_block_mask(stain_normalized_images) baseline
-                masked_images, masks = self.random_irregular_mask(stain_normalized_images) # first variant
+                # masked_images, masks = self.random_irregular_mask(stain_normalized_images) # first variant
                 # masked_images, masks = self.multi_scale_mask(stain_normalized_images) # second variant
                 # masked_images, masks = self.perlin_noise_mask(stain_normalized_images)
                 # masked_images, masks = self.circular_mask(stain_normalized_images)
-                
+                masked_images, masks = self.apply_random_mask(stain_normalized_images)
                 
 
         
