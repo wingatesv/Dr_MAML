@@ -332,6 +332,7 @@ class Aux_MAML(MetaTemplate):
     
         # Define the available mask types
         mask_type = random.choice(['multi_scale', 'circular',  'random_block'])
+        print('Choice: ', mask_type)
     
         # Apply the corresponding mask function
         if mask_type == 'multi_scale':
