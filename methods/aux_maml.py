@@ -511,7 +511,12 @@ class Aux_MAML(MetaTemplate):
     
                     aux_loss = self.aux_loss_fn(reconstructed_images, stain_normalized_images)
                 # Total loss
-                total_loss = set_loss_cls + 0.5 * aux_loss
+                # Schedule the auxiliary loss weight to increase linearly from 0.001 to 1
+                min_weight = 0.001
+                max_weight = 1.0
+                aux_loss_weight = min_weight + (max_weight - min_weight) * (self.current_epoch / 200)
+
+                total_loss = set_loss_cls + aux_loss_weight * aux_loss
                 # Compute gradient similarity between main loss and auxiliary loss
                 # main_grads = torch.autograd.grad(set_loss_cls, fast_parameters, retain_graph=True, create_graph=True)
                 # aux_grads = torch.autograd.grad(aux_loss, fast_parameters, retain_graph=True, create_graph=True)
